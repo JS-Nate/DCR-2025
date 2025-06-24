@@ -1,0 +1,10 @@
+graph TD
+    A[Sensors: Collects HRV, EEG, Eye-Tracking Data] -->|Real-Time Data| B[Analytics Engine: Processes Data <10ms, Generates Risk Score]
+    B -->|Performance-Risk Score & Alerts| C[HMI: Delivers Alerts, Task Adjustments]
+    C -->|Feedback & Data| D[Integration Modules: Syncs with Plant Control & Simulators]
+    C -->|Data Exchange| D
+    D -->|Training & Reactor Data| C
+    style A fill:#90ee90,stroke:#333,stroke-width:2px,color:#000
+    style B fill:#d3d3d3,stroke:#333,stroke-width:2px,color:#000
+    style C fill:#90ee90,stroke:#333,stroke-width:2px,color:#000
+    style D fill:#ffa500,stroke:#333,stroke-width:2px,color:#000
