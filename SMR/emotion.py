@@ -5,6 +5,7 @@ from deepface import DeepFace
 import threading
 import queue
 from concurrent.futures import ThreadPoolExecutor
+import os
 
 # === GLOBAL SETUP ===
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
@@ -16,10 +17,16 @@ results = {"Emotion Detection": [], "Time": []}
 results_lock = threading.Lock()
 frame_queue = queue.Queue(maxsize=1)
 
+# Output file setup
+os.makedirs("Results", exist_ok=True)
+timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+csv_path = f"Results/emotion_detection-{Operator_name}-{timestamp}.csv"
+
+SAVE_EVERY_N = 10  # Save results every N detections
+
 # === EMOTION ANALYSIS FUNCTION ===
 def analyze_emotion(face_roi, x, y, w, h, frame, dt_now):
     try:
-        # result = DeepFace.analyze(face_roi, actions=['emotion'], enforce_detection=False, device='cuda')
         result = DeepFace.analyze(face_roi, actions=['emotion'], enforce_detection=False)
         emotion = result[0]['dominant_emotion']
     except Exception as e:
@@ -31,7 +38,11 @@ def analyze_emotion(face_roi, x, y, w, h, frame, dt_now):
 
     with results_lock:
         results["Emotion Detection"].append(emotion)
-        results["Time"].append(dt_now)
+        results["Time"].append(dt_now.strftime("%Y-%m-%d %H:%M:%S"))
+
+        # Save periodically to CSV
+        if len(results["Emotion Detection"]) % SAVE_EVERY_N == 0:
+            pd.DataFrame(results).to_csv(csv_path, index=False)
 
 # === FRAME CAPTURE THREAD ===
 def capture_frames():
@@ -44,7 +55,7 @@ def capture_frames():
 
 # === FRAME PROCESSING THREAD ===
 def process_frames():
-    executor = ThreadPoolExecutor(max_workers=2)  # Limit GPU load
+    executor = ThreadPoolExecutor(max_workers=2)
     while True:
         frame = frame_queue.get()
         if frame is None:
@@ -75,14 +86,12 @@ t2 = threading.Thread(target=process_frames)
 t1.start()
 t2.start()
 
-t2.join()  # Wait for processing to end
+t2.join()
 
-# === SAVE RESULTS ===
-results_df = pd.DataFrame(results)
-print(results_df)
-
-timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-results_df.to_csv(f"Results/emotion_detection-{Operator_name}-{timestamp}.csv")
+# === FINAL CSV SAVE ===
+with results_lock:
+    pd.DataFrame(results).to_csv(csv_path, index=False)
+    print(f"\nFinal results saved to: {csv_path}")
 
 cap.release()
 cv2.destroyAllWindows()

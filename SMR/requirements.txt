@@ -1,0 +1,9 @@
+opencv-python
+deepface==0.0.93
+tensorflow==2.19.0
+pandas
+numpy
+python-dateutil
+pytz
+tzdata
+tf-keras

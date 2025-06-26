@@ -9,7 +9,7 @@ face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_fronta
 Dt_file= datetime.datetime.now()
 Dt_file =Dt_file.strftime("%Y%m%d")
 # Start capturing video
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(0)
 
 Operator_name = input("Please Enter your name Before start the Scenario:")
 
