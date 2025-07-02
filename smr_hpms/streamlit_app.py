@@ -1,30 +1,22 @@
+# streamlit_app.py
 import streamlit as st
 import pandas as pd
 import time
-from datetime import datetime
-from analysis import calculate_performance_score, detect_coupling, get_alert_level
-from llama_utils import query_llama
-from analysis import check_safety_margins
+from analysis import calculate_performance_score, check_safety_margins
 
+st.set_page_config(page_title="SMR HPMS Dashboard", layout="wide")
+st.title("🧠 SMR Human Performance Management System (HPMS)")
 
-st.set_page_config(page_title="SMR HPMS Dashboard", layout="centered")
-
-st.title("SMR Human Performance Management System")
-
-# Auto-refresh every N seconds
 AUTO_REFRESH_SEC = 5
 st.markdown(f"🔄 Auto-refreshing every **{AUTO_REFRESH_SEC} seconds**...")
 time.sleep(AUTO_REFRESH_SEC)
-
-
-st.markdown("Upload your CSV data to assess operator performance in a control room environment.")
 
 uploaded_file = st.file_uploader("Upload CSV file", type="csv")
 
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
-    st.write("Uploaded Data (Most Recent Row):")
-    st.dataframe(df.tail(1))
+    df['timestamp'] = pd.to_datetime(df['timestamp'])
+    df = df.sort_values(by="timestamp")
 
     row = df.iloc[-1]
     hr = row['heart_rate']
@@ -33,48 +25,26 @@ if uploaded_file:
     task = row['task']
     emotion = row['face_emotion']
 
-
-    # score = calculate_performance_score(hr, eeg, temp, task)
     score = calculate_performance_score(hr, eeg, temp, task, emotion)
-    safety_alerts = check_safety_margins(hr, eeg, temp, emotion)
-    coupling = detect_coupling(hr, eeg, temp)
-    alert_level, alert_reason = get_alert_level(score)
+    safety_data = check_safety_margins(hr, eeg, temp, emotion)
 
-    st.markdown(f"### Performance Score: `{score}`")
-    st.markdown(f"### Alert Level: `{alert_level}`")
-    st.markdown(f"**Face Emotion:** {emotion}")
-    st.info(alert_reason)
-    st.markdown("### 📏 Safety Margin Check")
-    if not safety_alerts:
-        st.success("✅ All safety margins within range.")
-    else:
-        for alert in safety_alerts:
-            if "🚨" in alert:
-                st.error(alert)
-            elif "⚠️" in alert:
-                st.warning(alert)
+    st.metric("Performance Score", score)
 
     st.markdown("### 📐 Performance Hierarchy Status")
-    df_margin = pd.DataFrame(safety_alerts, columns=["ID", "Parameter", "Value", "Status"])
-    st.dataframe(df_margin, hide_index=True, use_container_width=True)
-
-
-    st.markdown("### Coupling Issues Detected:")
-    for issue in coupling:
-        st.write(f"- {issue}")
-
+    df_margin = pd.DataFrame(safety_data, columns=["ID", "Parameter", "Value", "Status"])
+    # st.dataframe(df_margin, hide_index=True, use_container_width=True)
+    # Force all values to string to prevent Arrow conversion crash
+    df_margin_display = df_margin.astype(str)
+    st.dataframe(df_margin_display, hide_index=True, use_container_width=True)
 
 
 
 
-    # Alert log section
     st.markdown("### 📝 Recent Alert Log")
-
     if "alert_log" not in st.session_state:
         st.session_state.alert_log = []
 
-    # Append only the violated margins
-    for item in safety_alerts:
+    for item in safety_data:
         if "⚠️" in item[3] or "🚨" in item[3]:
             st.session_state.alert_log.append({
                 "timestamp": row['timestamp'],
@@ -84,46 +54,55 @@ if uploaded_file:
                 "status": item[3]
             })
 
-    # Show last 10 alerts
     if st.session_state.alert_log:
+        # df_log = pd.DataFrame(st.session_state.alert_log[-10:])
+        # st.dataframe(df_log, hide_index=True, use_container_width=True)
+
         df_log = pd.DataFrame(st.session_state.alert_log[-10:])
-        st.dataframe(df_log, hide_index=True, use_container_width=True)
+        df_log_display = df_log.astype(str)
+        st.dataframe(df_log_display, hide_index=True, use_container_width=True)
+
+
     else:
         st.success("No recent margin violations.")
 
+    st.markdown("### 📈 Operator Trend Plots")
 
+    eeg_map = {
+        "alpha-dominant": 1,
+        "beta-dominant": 2,
+        "theta-dominant": 3,
+        "alpha-suppressed": 4
+    }
+    emotion_map = {
+        "happy": 1,
+        "neutral": 2,
+        "surprised": 3,
+        "sad": 4,
+        "fear": 5,
+        "angry": 6
+    }
 
+    df['eeg_numeric'] = df['eeg_signal'].str.lower().map(eeg_map)
+    df['emotion_numeric'] = df['face_emotion'].str.lower().map(emotion_map)
 
+    st.line_chart(df.set_index('timestamp')[['heart_rate', 'room_temp']])
+    st.line_chart(df.set_index('timestamp')[['eeg_numeric']].rename(columns={'eeg_numeric': 'EEG (coded)'}))
+    st.line_chart(df.set_index('timestamp')[['emotion_numeric']].rename(columns={'emotion_numeric': 'Emotion (coded)'}))
 
+    with st.expander("ℹ️ Coded Value Legend"):
+        st.markdown("""
+        **EEG Codes**  
+        1 = alpha-dominant  
+        2 = beta-dominant  
+        3 = theta-dominant  
+        4 = alpha-suppressed  
 
-
-
-
-
-
-
-    prompt = f"""
-You're acting as a Human Performance Management System (HPMS) assistant in an SMR control room.
-
-Inputs:
-- Heart Rate: {hr} bpm
-- EEG Signal: {eeg}
-- Room Temp: {temp} °C
-- Task: {task}
-- Observed Face Emotion: {emotion}
-- Performance Score (0-1): {score}
-- Detected Coupling Issues: {', '.join(coupling)}
-- Alert Level: {alert_level}
-
-Instructions:
-1. Briefly justify the alert level.
-2. Analyze how facial emotion and physiological state impact performance.
-3. Recommend human, environmental, or operational interventions.
-"""
-
-
-    with st.spinner("Analyzing with LLaMA..."):
-        llama_output = query_llama(prompt)
-
-    st.markdown("### LLaMA Recommendations")
-    st.write(llama_output)
+        **Emotion Codes**  
+        1 = happy  
+        2 = neutral  
+        3 = surprised  
+        4 = sad  
+        5 = fear  
+        6 = angry
+        """)
