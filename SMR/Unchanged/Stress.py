@@ -12,7 +12,7 @@ Dt_file = datetime.datetime.now()
 Dt_file = Dt_file.strftime("%Y%m%d")
 
 # Start capturing video
-cap = cv2.VideoCapture(0)  # Change index if needed
+cap = cv2.VideoCapture(1)  # Change index if needed
 
 Operator_name = input("Please Enter your name Before start the Scenario:")
 
@@ -79,7 +79,8 @@ while True:
 # Save the results
 results = pd.DataFrame(results)
 dt_now_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-results.to_csv(f"Results/Stress-{Operator_name}-{dt_now_str}.csv", index=False)
+# results.to_csv(f"Results/Stress-{Operator_name}-{dt_now_str}.csv", index=False)
+results.to_csv(f"Results\\Stress-{Operator_name}-{dt_now_str}.csv", index=False)
 
 # Release the capture and close all windows
 cap.release()
