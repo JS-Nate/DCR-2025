@@ -1,12 +1,13 @@
-# streamlit_app.py
 import streamlit as st
 import pandas as pd
 import time
+import requests
 from analysis import calculate_performance_score, check_safety_margins
 
 st.set_page_config(page_title="SMR HPMS Dashboard", layout="wide")
 st.title("🧠 SMR Human Performance Management System (HPMS)")
 
+# 🔁 Auto-refresh simulation
 AUTO_REFRESH_SEC = 5
 st.markdown(f"🔄 Auto-refreshing every **{AUTO_REFRESH_SEC} seconds**...")
 time.sleep(AUTO_REFRESH_SEC)
@@ -18,6 +19,7 @@ if uploaded_file:
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     df = df.sort_values(by="timestamp")
 
+    # Most recent row
     row = df.iloc[-1]
     hr = row['heart_rate']
     eeg = row['eeg_signal']
@@ -25,21 +27,19 @@ if uploaded_file:
     task = row['task']
     emotion = row['face_emotion']
 
+    # Calculate performance and check margins
     score = calculate_performance_score(hr, eeg, temp, task, emotion)
     safety_data = check_safety_margins(hr, eeg, temp, emotion)
 
+    # 🔢 Score Display
     st.metric("Performance Score", score)
 
+    # 📐 Hierarchy Table
     st.markdown("### 📐 Performance Hierarchy Status")
     df_margin = pd.DataFrame(safety_data, columns=["ID", "Parameter", "Value", "Status"])
-    # st.dataframe(df_margin, hide_index=True, use_container_width=True)
-    # Force all values to string to prevent Arrow conversion crash
-    df_margin_display = df_margin.astype(str)
-    st.dataframe(df_margin_display, hide_index=True, use_container_width=True)
+    st.dataframe(df_margin.astype(str), hide_index=True, use_container_width=True)
 
-
-
-
+    # 📝 Alert Log
     st.markdown("### 📝 Recent Alert Log")
     if "alert_log" not in st.session_state:
         st.session_state.alert_log = []
@@ -55,17 +55,12 @@ if uploaded_file:
             })
 
     if st.session_state.alert_log:
-        # df_log = pd.DataFrame(st.session_state.alert_log[-10:])
-        # st.dataframe(df_log, hide_index=True, use_container_width=True)
-
         df_log = pd.DataFrame(st.session_state.alert_log[-10:])
-        df_log_display = df_log.astype(str)
-        st.dataframe(df_log_display, hide_index=True, use_container_width=True)
-
-
+        st.dataframe(df_log.astype(str), hide_index=True, use_container_width=True)
     else:
         st.success("No recent margin violations.")
 
+    # 📈 Trend Plots
     st.markdown("### 📈 Operator Trend Plots")
 
     eeg_map = {
@@ -106,3 +101,29 @@ if uploaded_file:
         5 = fear  
         6 = angry
         """)
+
+    # 🤖 LLaMA Response
+    st.markdown("### 🤖 LLaMA Response")
+    prompt = f"""You are an HPMS assistant in a nuclear control room. Analyze the operator's current state.
+
+    Heart rate: {hr} bpm
+    EEG: {eeg}
+    Room temp: {temp}°C
+    Emotion: {emotion}
+    Task: {task}
+
+    Provide a short summary on:
+    1. Performance risks
+    2. Coupling concerns
+    3. Suggested actions
+    """
+
+    try:
+        response = requests.post(
+            "http://localhost:11434/api/generate",
+            json={"model": "llama2", "prompt": prompt, "stream": False}
+        )
+        result = response.json()
+        st.write(result.get("response", "[No response received from LLaMA]"))
+    except Exception as e:
+        st.error(f"LLaMA API call failed: {e}")
