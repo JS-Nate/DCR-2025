@@ -14,84 +14,64 @@ SAFETY_MARGINS = {
     "2.1_room_temp": {"min": 21, "max": 28}
 }
 
-def calculate_performance_score(hr, eeg_signal, room_temp, task, face_emotion):
-    if hr < 90:
-        hr_score = 0.1
-    elif hr < 110:
-        hr_score = 0.5
+
+
+
+def calculate_performance_score(hr, eeg, temp, task, emotion,
+                                light_temp, light_intensity, humidity, pressure):
+    score = 1.0
+
+    # Physiological adjustments
+    if hr > 110 or hr < 50:
+        score -= 0.15
+    if eeg.lower() in ["alpha-suppressed", "theta-dominant"]:
+        score -= 0.1
+    if emotion.lower() in ["sad", "fear", "angry"]:
+        score -= 0.05
+
+    # Environmental factors
+    if temp > 28 or temp < 20:
+        score -= 0.05
+    if not (4500 <= light_temp <= 5500):
+        score -= 0.05
+    if light_intensity < 300 or light_intensity > 1000:
+        score -= 0.05
+    if humidity < 30 or humidity > 60:
+        score -= 0.05
+    if pressure < 980 or pressure > 1020:
+        score -= 0.05
+
+    return round(max(0.0, min(score, 1.0)), 2)
+
+
+
+def check_safety_margins(hr, eeg, temp, emotion, light_temp, light_intensity, humidity, pressure):
+    status = []
+
+    def margin(value, low, high, param, id):
+        if value < low:
+            return (id, param, value, f"⚠️ Below threshold (< {low})")
+        elif value > high:
+            return (id, param, value, f"🚨 Above threshold (> {high})")
+        else:
+            return (id, param, value, "✅ Normal")
+
+    status.append(margin(hr, 60, 100, "Heart Rate", "1.1"))
+    status.append(margin(temp, 20, 27, "Room Temperature", "1.2"))
+
+    if eeg.lower() in ["alpha-suppressed", "theta-dominant"]:
+        status.append(("1.3", "EEG", eeg, "⚠️ Suboptimal"))
     else:
-        hr_score = 0.9
+        status.append(("1.3", "EEG", eeg, "✅ Normal"))
 
-    eeg_score = {
-        "alpha-dominant": 0.1,
-        "beta-dominant": 0.3,
-        "theta-dominant": 0.7,
-        "alpha-suppressed": 0.9
-    }.get(eeg_signal.lower(), 0.5)
-
-    if room_temp < 21 or room_temp > 28:
-        temp_score = 0.9
-    elif 26 < room_temp <= 28:
-        temp_score = 0.6
+    if emotion.lower() in ["sad", "fear", "angry"]:
+        status.append(("1.4", "Emotion", emotion, "⚠️ Elevated Stress"))
     else:
-        temp_score = 0.2
+        status.append(("1.4", "Emotion", emotion, "✅ Normal"))
 
-    task_difficulty = {
-        "startup": 0.4,
-        "load_change": 0.6,
-        "shutdown": 0.8,
-        "emergency_shutdown": 1.0
-    }.get(task.lower(), 0.5)
+    status.append(margin(light_temp, 4500, 5500, "Light Temperature (K)", "2.1"))
+    status.append(margin(light_intensity, 300, 1000, "Light Intensity (lux)", "2.2"))
+    status.append(margin(humidity, 30, 60, "Humidity (%)", "2.3"))
+    status.append(margin(pressure, 980, 1020, "Pressure (hPa)", "2.4"))
 
-    emotion_score = {
-        "happy": 0.1,
-        "neutral": 0.2,
-        "sad": 0.7,
-        "fear": 0.8,
-        "angry": 0.9,
-        "surprised": 0.6
-    }.get(face_emotion.lower(), 0.5)
-
-    score = (
-        0.25 * hr_score +
-        0.25 * eeg_score +
-        0.15 * temp_score +
-        0.15 * task_difficulty +
-        0.2 * emotion_score
-    )
-    return round(score, 2)
-
-def check_safety_margins(hr, eeg_signal, temp, emotion):
-    result = []
-
-    if hr < SAFETY_MARGINS["1.1_heart_rate"]["min"] or hr > SAFETY_MARGINS["1.1_heart_rate"]["max"]:
-        status = "🚨 Danger"
-    else:
-        status = "✅ OK"
-    result.append(("1.1", "Heart Rate", hr, status))
-
-    eeg = eeg_signal.lower()
-    if eeg in SAFETY_MARGINS["1.2_eeg_signal"]["danger"]:
-        status = "🚨 Danger"
-    elif eeg in SAFETY_MARGINS["1.2_eeg_signal"]["warning"]:
-        status = "⚠️ Warning"
-    else:
-        status = "✅ OK"
-    result.append(("1.2", "EEG Signal", eeg_signal, status))
-
-    emo = emotion.lower()
-    if emo in SAFETY_MARGINS["1.3_face_emotion"]["danger"]:
-        status = "🚨 Danger"
-    elif emo in SAFETY_MARGINS["1.3_face_emotion"]["warning"]:
-        status = "⚠️ Warning"
-    else:
-        status = "✅ OK"
-    result.append(("1.3", "Facial Emotion", emotion, status))
-
-    if temp < SAFETY_MARGINS["2.1_room_temp"]["min"] or temp > SAFETY_MARGINS["2.1_room_temp"]["max"]:
-        status = "🚨 Danger"
-    else:
-        status = "✅ OK"
-    result.append(("2.1", "Room Temperature", temp, status))
-
-    return result
+    return status

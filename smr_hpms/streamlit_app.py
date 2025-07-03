@@ -26,16 +26,20 @@ if uploaded_file:
     temp = row['room_temp']
     task = row['task']
     emotion = row['face_emotion']
+    light_temp = row.get('light_temp', 'unknown')
+    light_intensity = row.get('light_intensity', 'unknown')
+    humidity = row.get('humidity', 'unknown')
+    pressure = row.get('pressure', 'unknown')
 
     # Calculate performance and check margins
-    score = calculate_performance_score(hr, eeg, temp, task, emotion)
-    safety_data = check_safety_margins(hr, eeg, temp, emotion)
+    score = calculate_performance_score(hr, eeg, temp, task, emotion, light_temp, light_intensity, humidity, pressure)
+    safety_data = check_safety_margins(hr, eeg, temp, emotion, light_temp, light_intensity, humidity, pressure)
 
     # 🔢 Score Display
     st.metric("Performance Score", score)
 
-    # 📐 Hierarchy Table
-    st.markdown("### 📐 Performance Hierarchy Status")
+    # 📊 Hierarchy Table
+    st.markdown("### 📊 Performance Hierarchy Status")
     df_margin = pd.DataFrame(safety_data, columns=["ID", "Parameter", "Value", "Status"])
     st.dataframe(df_margin.astype(str), hide_index=True, use_container_width=True)
 
@@ -111,6 +115,10 @@ if uploaded_file:
     Room temp: {temp}°C
     Emotion: {emotion}
     Task: {task}
+    Light temperature: {light_temp}
+    Light intensity: {light_intensity}
+    Humidity: {humidity}%
+    Pressure: {pressure} kPa
 
     Provide a short summary on:
     1. Performance risks

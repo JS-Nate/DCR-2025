@@ -20,7 +20,7 @@ def query_llama(prompt: str):
 
 
 if __name__ == "__main__":
-    df = read_inputs("sample_data.csv")
+    df = read_inputs("hpms_extended_inputs.csv")
     row = df.iloc[-1]
 
     # Extract input parameters

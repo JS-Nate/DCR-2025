@@ -1,0 +1,11 @@
+timestamp,heart_rate,eeg_signal,room_temp,face_emotion,task,light_temp,light_intensity,humidity,pressure
+2025-07-03 16:09:44.840955,70,alpha-suppressed,21.8,surprised,Emergency Shutdown,5994.0,908.0,52.9,985.2
+2025-07-03 16:14:44.840973,90,beta-dominant,25.7,angry,Emergency Shutdown,5975.0,323.0,38.0,990.4
+2025-07-03 16:19:44.840978,101,theta-dominant,22.7,sad,Emergency Shutdown,5788.0,688.0,35.7,1019.9
+2025-07-03 16:24:44.840981,105,alpha-dominant,24.7,fear,Emergency Shutdown,4982.0,837.0,57.5,996.4
+2025-07-03 16:29:44.840985,77,alpha-suppressed,26.3,neutral,Emergency Shutdown,4796.0,351.0,47.8,1002.2
+2025-07-03 16:34:44.840989,79,theta-dominant,26.5,sad,Emergency Shutdown,4519.0,435.0,44.3,1003.4
+2025-07-03 16:39:44.840993,95,theta-dominant,26.7,neutral,Emergency Shutdown,5188.0,303.0,56.8,1018.3
+2025-07-03 16:44:44.840999,88,alpha-suppressed,27.3,sad,Emergency Shutdown,4593.0,694.0,43.0,992.8
+2025-07-03 16:49:44.841003,94,beta-dominant,22.3,neutral,Emergency Shutdown,4036.0,958.0,31.4,999.8
+2025-07-03 16:54:44.841008,98,theta-dominant,25.7,sad,Emergency Shutdown,5451.0,492.0,43.3,998.7
