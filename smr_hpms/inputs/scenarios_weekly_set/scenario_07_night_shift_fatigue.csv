@@ -1,0 +1,13 @@
+timestamp,heart_rate,eeg_signal,room_temp,face_emotion,task,light_temp,light_intensity,humidity,pressure
+2025-07-04 05:45:04.202817,108,theta-dominant,26.1,sad,Routine Monitoring,5676.5,1017.4,54.5,1016.9
+2025-07-04 05:45:34.202817,99,theta-dominant,28.7,sad,Routine Monitoring,5425.3,317.1,44.4,991.0
+2025-07-04 05:46:04.202817,103,theta-dominant,22.6,sad,Routine Monitoring,5969.8,699.6,25.4,992.8
+2025-07-04 05:46:34.202817,97,theta-dominant,25.9,sad,Routine Monitoring,5830.9,899.4,41.1,1011.6
+2025-07-04 05:47:04.202817,105,theta-dominant,26.7,sad,Routine Monitoring,4242.2,221.4,45.9,1017.7
+2025-07-04 05:47:34.202817,106,theta-dominant,23.5,sad,Routine Monitoring,6150.8,592.8,45.7,1033.4
+2025-07-04 05:48:04.202817,96,theta-dominant,29.4,sad,Routine Monitoring,5716.8,976.0,41.4,979.9
+2025-07-04 05:48:34.202817,102,theta-dominant,24.1,sad,Routine Monitoring,6345.8,180.9,62.3,1031.5
+2025-07-04 05:49:04.202817,100,theta-dominant,25.4,sad,Routine Monitoring,5631.0,808.3,60.9,996.3
+2025-07-04 05:49:34.202817,110,theta-dominant,28.1,sad,Routine Monitoring,5344.1,1050.9,35.2,990.9
+2025-07-04 05:50:04.202817,110,theta-dominant,29.5,sad,Routine Monitoring,4976.0,323.6,67.3,996.8
+2025-07-04 05:50:34.202817,97,theta-dominant,22.3,sad,Routine Monitoring,4390.7,674.6,43.7,1009.8

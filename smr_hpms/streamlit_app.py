@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import time
 import requests
+import datetime
 from analysis import calculate_performance_score, check_safety_margins
 
 st.set_page_config(page_title="SMR HPMS Dashboard", layout="wide")
@@ -13,6 +14,11 @@ st.markdown(f"🔄 Auto-refreshing every **{AUTO_REFRESH_SEC} seconds**...")
 time.sleep(AUTO_REFRESH_SEC)
 
 uploaded_file = st.file_uploader("Upload CSV file", type="csv")
+
+if "alert_log" not in st.session_state:
+    st.session_state.alert_log = []
+if "feedback_log" not in st.session_state:
+    st.session_state.feedback_log = []
 
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
@@ -35,19 +41,15 @@ if uploaded_file:
     score = calculate_performance_score(hr, eeg, temp, task, emotion, light_temp, light_intensity, humidity, pressure)
     safety_data = check_safety_margins(hr, eeg, temp, emotion, light_temp, light_intensity, humidity, pressure)
 
-    # 🔢 Score Display
     st.metric("Performance Score", score)
 
-    # 📊 Hierarchy Table
+    # 📊 Performance Hierarchy
     st.markdown("### 📊 Performance Hierarchy Status")
     df_margin = pd.DataFrame(safety_data, columns=["ID", "Parameter", "Value", "Status"])
     st.dataframe(df_margin.astype(str), hide_index=True, use_container_width=True)
 
     # 📝 Alert Log
     st.markdown("### 📝 Recent Alert Log")
-    if "alert_log" not in st.session_state:
-        st.session_state.alert_log = []
-
     for item in safety_data:
         if "⚠️" in item[3] or "🚨" in item[3]:
             st.session_state.alert_log.append({
@@ -66,7 +68,6 @@ if uploaded_file:
 
     # 📈 Trend Plots
     st.markdown("### 📈 Operator Trend Plots")
-
     eeg_map = {
         "alpha-dominant": 1,
         "beta-dominant": 2,
@@ -126,12 +127,36 @@ if uploaded_file:
     3. Suggested actions
     """
 
+    llama_response = "[No response received]"
     try:
         response = requests.post(
             "http://localhost:11434/api/generate",
             json={"model": "llama2", "prompt": prompt, "stream": False}
         )
         result = response.json()
-        st.write(result.get("response", "[No response received from LLaMA]"))
+        llama_response = result.get("response", "[No response received from LLaMA]")
+        st.write(llama_response)
     except Exception as e:
         st.error(f"LLaMA API call failed: {e}")
+
+    # 📬 Operator Feedback
+    st.markdown("### 📬 Operator Feedback")
+    feedback = st.radio("Do you agree with the AI's analysis?", [
+        "✅ Acknowledged and will take action",
+        "🕒 Acknowledged but defer action",
+        "❌ Disagree with assessment"
+    ])
+    notes = st.text_area("Optional Notes (e.g., context or follow-up actions)")
+
+    if st.button("Submit Feedback"):
+        st.session_state.feedback_log.append({
+            "timestamp": datetime.datetime.now(),
+            "response": feedback,
+            "notes": notes,
+            "score": score
+        })
+        st.success("✅ Feedback submitted.")
+
+    if st.session_state.feedback_log:
+        st.markdown("### 📚 Feedback Log")
+        st.dataframe(pd.DataFrame(st.session_state.feedback_log), use_container_width=True)

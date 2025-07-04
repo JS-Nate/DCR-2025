@@ -1,0 +1,13 @@
+timestamp,heart_rate,eeg_signal,room_temp,face_emotion,task,light_temp,light_intensity,humidity,pressure
+2025-07-04 05:45:04.202817,94,beta-dominant,29.1,angry,Diagnostics,5561.7,625.4,66.1,984.2
+2025-07-04 05:45:34.202817,87,beta-dominant,24.2,angry,Diagnostics,5887.1,961.7,64.5,1027.2
+2025-07-04 05:46:04.202817,87,beta-dominant,22.6,angry,Diagnostics,4950.3,1176.4,36.4,1008.1
+2025-07-04 05:46:34.202817,82,beta-dominant,23.5,angry,Diagnostics,4581.2,660.9,46.5,1010.3
+2025-07-04 05:47:04.202817,89,beta-dominant,29.3,angry,Diagnostics,5899.2,973.4,51.2,984.8
+2025-07-04 05:47:34.202817,81,beta-dominant,26.0,angry,Diagnostics,4933.9,1129.7,56.6,997.5
+2025-07-04 05:48:04.202817,86,beta-dominant,23.6,angry,Diagnostics,5952.8,827.1,67.2,982.5
+2025-07-04 05:48:34.202817,85,beta-dominant,29.2,angry,Diagnostics,4788.9,683.8,43.4,1001.3
+2025-07-04 05:49:04.202817,95,beta-dominant,25.2,angry,Diagnostics,4986.0,597.5,47.5,989.5
+2025-07-04 05:49:34.202817,83,beta-dominant,29.8,angry,Diagnostics,5724.7,153.1,57.8,985.0
+2025-07-04 05:50:04.202817,85,beta-dominant,29.0,angry,Diagnostics,5216.3,617.4,46.0,1018.4
+2025-07-04 05:50:34.202817,82,beta-dominant,28.6,angry,Diagnostics,5374.8,1078.5,61.5,977.2

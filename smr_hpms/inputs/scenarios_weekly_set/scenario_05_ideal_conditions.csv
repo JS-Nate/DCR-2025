@@ -1,0 +1,13 @@
+timestamp,heart_rate,eeg_signal,room_temp,face_emotion,task,light_temp,light_intensity,humidity,pressure
+2025-07-04 05:45:04.202817,72,alpha-dominant,27.9,happy,Startup Sequence,6222.8,297.1,51.6,1029.6
+2025-07-04 05:45:34.202817,70,alpha-dominant,27.0,happy,Startup Sequence,4605.8,199.8,45.3,982.9
+2025-07-04 05:46:04.202817,71,alpha-dominant,28.5,happy,Startup Sequence,5336.4,293.9,46.3,1011.3
+2025-07-04 05:46:34.202817,70,alpha-dominant,29.4,happy,Startup Sequence,4369.7,546.2,66.4,1029.4
+2025-07-04 05:47:04.202817,73,alpha-dominant,27.1,happy,Startup Sequence,4408.9,830.5,49.3,1012.2
+2025-07-04 05:47:34.202817,75,alpha-dominant,22.4,happy,Startup Sequence,6054.8,982.5,26.9,991.1
+2025-07-04 05:48:04.202817,75,alpha-dominant,24.5,happy,Startup Sequence,4211.2,703.5,28.5,975.9
+2025-07-04 05:48:34.202817,70,alpha-dominant,29.0,happy,Startup Sequence,4585.1,1022.7,49.3,975.7
+2025-07-04 05:49:04.202817,72,alpha-dominant,23.1,happy,Startup Sequence,6354.8,672.9,52.8,990.1
+2025-07-04 05:49:34.202817,71,alpha-dominant,23.4,happy,Startup Sequence,5938.0,368.1,25.3,1031.2
+2025-07-04 05:50:04.202817,73,alpha-dominant,25.0,happy,Startup Sequence,4814.0,815.2,29.5,985.3
+2025-07-04 05:50:34.202817,74,alpha-dominant,24.0,happy,Startup Sequence,6473.5,950.8,68.9,973.4

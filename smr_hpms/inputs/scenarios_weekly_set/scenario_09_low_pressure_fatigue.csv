@@ -1,0 +1,13 @@
+timestamp,heart_rate,eeg_signal,room_temp,face_emotion,task,light_temp,light_intensity,humidity,pressure
+2025-07-04 05:45:04.202817,101,alpha-suppressed,23.0,sad,Diagnostics,4486.2,223.8,26.7,1029.4
+2025-07-04 05:45:34.202817,107,alpha-suppressed,23.4,sad,Diagnostics,6309.6,1078.1,49.0,1034.3
+2025-07-04 05:46:04.202817,102,alpha-suppressed,24.0,sad,Diagnostics,6277.7,489.4,69.2,1029.1
+2025-07-04 05:46:34.202817,113,alpha-suppressed,25.2,sad,Diagnostics,6226.1,886.6,69.3,993.3
+2025-07-04 05:47:04.202817,114,alpha-suppressed,25.8,sad,Diagnostics,5254.9,734.3,68.0,992.3
+2025-07-04 05:47:34.202817,108,alpha-suppressed,29.8,sad,Diagnostics,4452.1,103.4,51.6,1023.5
+2025-07-04 05:48:04.202817,100,alpha-suppressed,27.6,sad,Diagnostics,5056.8,272.2,40.2,1007.4
+2025-07-04 05:48:34.202817,104,alpha-suppressed,28.6,sad,Diagnostics,6027.4,665.0,60.2,1020.6
+2025-07-04 05:49:04.202817,108,alpha-suppressed,27.3,sad,Diagnostics,6491.7,491.7,54.4,993.4
+2025-07-04 05:49:34.202817,101,alpha-suppressed,29.2,sad,Diagnostics,5770.6,435.1,66.0,1012.2
+2025-07-04 05:50:04.202817,103,alpha-suppressed,24.3,sad,Diagnostics,6278.4,1051.1,42.7,976.1
+2025-07-04 05:50:34.202817,107,alpha-suppressed,25.7,sad,Diagnostics,5713.8,617.1,60.7,1026.3

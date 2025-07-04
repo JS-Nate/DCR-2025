@@ -1,0 +1,13 @@
+timestamp,heart_rate,eeg_signal,room_temp,face_emotion,task,light_temp,light_intensity,humidity,pressure
+2025-07-04 05:45:04.202817,71,alpha-dominant,26.9,neutral,Routine Monitoring,4397.9,114.5,53.8,1028.4
+2025-07-04 05:45:34.202817,71,alpha-dominant,27.7,neutral,Routine Monitoring,4632.5,258.0,55.5,991.4
+2025-07-04 05:46:04.202817,74,alpha-dominant,22.8,neutral,Routine Monitoring,5375.9,905.8,58.3,987.5
+2025-07-04 05:46:34.202817,66,alpha-dominant,24.6,neutral,Routine Monitoring,6204.0,228.2,41.9,1020.4
+2025-07-04 05:47:04.202817,67,alpha-dominant,23.2,neutral,Routine Monitoring,4498.3,101.4,55.8,1034.6
+2025-07-04 05:47:34.202817,66,alpha-dominant,24.2,neutral,Routine Monitoring,4566.2,515.3,59.4,1030.9
+2025-07-04 05:48:04.202817,67,alpha-dominant,28.7,neutral,Routine Monitoring,5210.9,322.1,37.3,1011.8
+2025-07-04 05:48:34.202817,66,alpha-dominant,24.6,neutral,Routine Monitoring,5160.8,159.7,67.3,999.0
+2025-07-04 05:49:04.202817,71,alpha-dominant,22.1,neutral,Routine Monitoring,5399.8,272.4,57.0,1025.9
+2025-07-04 05:49:34.202817,71,alpha-dominant,26.7,neutral,Routine Monitoring,5631.3,557.5,42.0,980.0
+2025-07-04 05:50:04.202817,75,alpha-dominant,29.4,neutral,Routine Monitoring,4715.5,295.5,64.7,1014.0
+2025-07-04 05:50:34.202817,73,alpha-dominant,25.8,neutral,Routine Monitoring,6204.3,956.5,47.8,1023.0

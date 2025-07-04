@@ -1,0 +1,13 @@
+timestamp,heart_rate,eeg_signal,room_temp,face_emotion,task,light_temp,light_intensity,humidity,pressure
+2025-07-04 05:45:04.202817,102,alpha-suppressed,23.7,fear,Emergency Shutdown,5608.4,397.2,59.6,998.0
+2025-07-04 05:45:34.202817,102,alpha-suppressed,26.9,fear,Emergency Shutdown,6160.9,303.8,35.5,999.2
+2025-07-04 05:46:04.202817,121,alpha-suppressed,24.8,fear,Emergency Shutdown,5753.3,822.2,29.0,972.7
+2025-07-04 05:46:34.202817,127,alpha-suppressed,23.8,fear,Emergency Shutdown,4606.8,1041.1,26.1,1031.3
+2025-07-04 05:47:04.202817,124,alpha-suppressed,29.0,fear,Emergency Shutdown,4840.8,267.1,63.1,1013.1
+2025-07-04 05:47:34.202817,121,alpha-suppressed,25.8,fear,Emergency Shutdown,4801.7,260.9,47.2,1028.5
+2025-07-04 05:48:04.202817,127,alpha-suppressed,25.4,fear,Emergency Shutdown,5468.0,243.0,54.5,1022.8
+2025-07-04 05:48:34.202817,119,alpha-suppressed,29.8,fear,Emergency Shutdown,5832.6,128.6,66.6,976.8
+2025-07-04 05:49:04.202817,129,alpha-suppressed,26.8,fear,Emergency Shutdown,4877.8,891.0,38.0,1001.8
+2025-07-04 05:49:34.202817,128,alpha-suppressed,22.2,fear,Emergency Shutdown,4334.9,1184.2,62.0,987.2
+2025-07-04 05:50:04.202817,129,alpha-suppressed,25.8,fear,Emergency Shutdown,4246.3,384.1,48.5,983.4
+2025-07-04 05:50:34.202817,114,alpha-suppressed,29.8,fear,Emergency Shutdown,4250.5,354.9,35.9,1020.5

@@ -1,0 +1,13 @@
+timestamp,heart_rate,eeg_signal,room_temp,face_emotion,task,light_temp,light_intensity,humidity,pressure
+2025-07-04 05:45:04.202817,93,beta-dominant,27.9,fear,Diagnostics,4405.7,237.5,36.2,1010.7
+2025-07-04 05:45:34.202817,90,beta-dominant,23.3,fear,Diagnostics,5589.4,107.8,62.1,1024.1
+2025-07-04 05:46:04.202817,99,beta-dominant,23.2,fear,Diagnostics,4565.2,872.2,37.4,1028.6
+2025-07-04 05:46:34.202817,90,beta-dominant,24.2,fear,Diagnostics,4432.9,204.2,27.0,1000.0
+2025-07-04 05:47:04.202817,87,beta-dominant,22.6,fear,Diagnostics,5692.6,335.1,64.3,1022.9
+2025-07-04 05:47:34.202817,92,beta-dominant,26.9,fear,Diagnostics,4240.9,530.8,54.1,982.1
+2025-07-04 05:48:04.202817,96,beta-dominant,22.5,fear,Diagnostics,5335.6,627.6,69.3,982.2
+2025-07-04 05:48:34.202817,97,beta-dominant,29.4,fear,Diagnostics,4394.5,579.3,69.9,1010.9
+2025-07-04 05:49:04.202817,92,beta-dominant,25.3,fear,Diagnostics,4874.4,840.7,25.6,994.2
+2025-07-04 05:49:34.202817,87,beta-dominant,26.1,fear,Diagnostics,6036.3,546.8,52.2,1020.7
+2025-07-04 05:50:04.202817,89,beta-dominant,26.7,fear,Diagnostics,5131.0,292.3,54.7,993.5
+2025-07-04 05:50:34.202817,86,beta-dominant,22.4,fear,Diagnostics,6202.6,537.0,58.0,1011.9
