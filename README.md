@@ -1,6 +1,5 @@
 # Summer2025
 
-A Streamlit application for exploring the SMR HPMS project data.
 
 ## How to Run
 
