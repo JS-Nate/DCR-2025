@@ -8,7 +8,7 @@ Follow these steps to get started:
 1. **Clone this repository** (if you haven't already):
 
    ```bash
-   git clone https://github.com/your-username/Summer2025.git
+   git clone https://github.com/JS-Nate/Summer2025.git
 
 
 2. **Navigate to the project folder:**
