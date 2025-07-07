@@ -40,7 +40,7 @@ Follow these steps to get started:
 
 ```
 Summer2025/
-├── ... (other project files)
+├── ... (other project files and folders)
 │  
 │  
 ├── smr_hpms/
