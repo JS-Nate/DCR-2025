@@ -1,0 +1,46 @@
+flowchart TD
+    subgraph INPUT_LAYER [Input Layer]
+        A1[Sensor Data or Uploaded CSV]
+        A2[Parse & Preprocess Data]
+        A3[Extract: HR, EEG, Emotion, Env Conditions, Task]
+    end
+
+    subgraph PROCESSING_LAYER [Processing Layer]
+        B1[Calculate Performance Score]
+        B2[Check Safety Margins]
+        B3[Send Input to LLaMA - AI Analysis]
+        B4[LLaMA Response: Risks & Suggestions]
+    end
+
+    subgraph OUTPUT_LAYER [Output Layer]
+        C1[Display Dashboard UI]
+        C2[Show Alerts, Score, Charts]
+        C3[Log Safety Margin Violations]
+        C4[Operator Feedback: Agree / Defer / Disagree]
+        C5[Log Feedback + Notes]
+    end
+
+    subgraph FEEDBACK_LOOP [Adaptive Feedback Loop - Planned]
+        D1[Monitor Post-Feedback Data]
+        D2[Compare to Previous AI Suggestion]
+        D3[Trigger Follow-up LLaMA Prompt]
+        D4[Adapt Recommendations Based on Outcome]
+    end
+
+    %% Connections
+    A1 --> A2 --> A3
+    A3 --> B1
+    A3 --> B2
+    A3 --> B3 --> B4
+
+    B1 --> C2
+    B2 --> C3
+    B4 --> C1
+    B4 --> C2
+    B4 --> C4
+    C4 --> C5
+
+    %% Feedback loop
+    C5 --> D1
+    D1 --> D2 --> D3 --> B3
+    D4 --> C1

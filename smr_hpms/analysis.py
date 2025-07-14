@@ -16,7 +16,6 @@ SAFETY_MARGINS = {
 
 
 
-
 def calculate_performance_score(hr, eeg, temp, task, emotion,
                                 light_temp, light_intensity, humidity, pressure):
     score = 1.0

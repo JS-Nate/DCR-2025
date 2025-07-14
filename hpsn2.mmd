@@ -1,0 +1,54 @@
+graph TD
+    subgraph HPMS_Components
+        A["hpms_extended_inputs.csv<br>(Inputs: heart_rate, eeg_signal, room_temp, etc.)"] -->|Processed by| B["map_inputs_to_nodes<br>(Uses analysis.py thresholds)"]
+        B -->|Maps to| C["HPSN (networkx.DiGraph)"]
+        C -->|Queries| D["query_hpsn<br>(Retrieves actions)"]
+        D -->|Suggestions to| E["Llama Prompt<br>(streamlit_app.py)"]
+        E -->|Response| F["Llama<br>(via requests.post)"]
+        F -->|Parsed Output| G["update_hpsn<br>(Adds nodes/edges)"]
+        G -->|Updates| C
+        H["Operator Feedback<br>(Streamlit UI)"] -->|Effectiveness| G
+        C -->|Saves to| I["hpsn.json"]
+        I -->|Loads to| C
+    end
+
+    subgraph HPSN_Structure
+        subgraph Operator_States
+            J[high_heart_rate]
+            K[theta-dominant]
+            L[angry]
+        end
+
+        subgraph Env_Conditions
+            M[high_temp]
+            N[high_humidity]
+        end
+
+        subgraph Tasks
+            O[emergency_shutdown]
+        end
+
+        subgraph Actions
+            P[take_deep_breaths]
+            Q[lower_room_temp]
+        end
+
+        %% Linking structure nodes to central graph
+        C --> J
+        C --> K
+        C --> L
+        C --> M
+        C --> N
+        C --> O
+        C --> P
+        C --> Q
+
+        %% Causal and mitigative relationships
+        J -->|causal, w=0.7| K
+        M -->|causal, w=0.6| J
+        L -->|causal, w=0.7| J
+        P -->|mitigative, w=0.5| J
+        Q -->|mitigative, w=0.6| M
+        J -->|impacts, w=0.8| O
+        K -->|impacts, w=0.7| O
+    end
