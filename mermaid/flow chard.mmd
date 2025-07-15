@@ -1,0 +1,16 @@
+flowchart TD
+    Start([Start]) --> Input[/Upload Scenario Data CSV or Live/]
+    Input --> Preprocess[Preprocess and Format Data]
+    Preprocess --> ScoreCalc[Calculate Performance Score]
+    ScoreCalc --> MarginCheck[Check Safety Margins]
+
+    MarginCheck --> Display[Display Score and Alerts]
+    Display --> LLaMA[Generate AI Summary - LLaMA]
+
+    LLaMA --> ShowOutput[/Show Recommendations to Operator/]
+    ShowOutput --> Decision{Operator Feedback?}
+    Decision -- Yes --> Log[Log Feedback and Notes]
+    Decision -- No --> End([End])
+
+    Log --> Adaptation[/Update System for Future/]
+    Adaptation --> End

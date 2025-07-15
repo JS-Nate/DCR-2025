@@ -1,0 +1,24 @@
+sequenceDiagram
+    participant Operator
+    participant UI
+    participant Preprocessor
+    participant ScoringEngine
+    participant SafetyChecker
+    participant LLaMA
+    participant FeedbackLogger
+
+    Operator->>UI: Upload Scenario Data
+    UI->>Preprocessor: Parse and Clean Input
+    Preprocessor->>ScoringEngine: Send Structured Data
+    ScoringEngine->>SafetyChecker: Check for Margin Violations
+    SafetyChecker-->>ScoringEngine: Flagged Parameters
+    ScoringEngine-->>UI: Display Score & Alerts
+
+    ScoringEngine->>LLaMA: Send Prompt (Operator State)
+    LLaMA-->>UI: Return Natural Language Summary
+
+    UI->>Operator: Display LLaMA Recommendations
+    Operator->>UI: Submit Feedback (Acknowledge / Notes)
+    UI->>FeedbackLogger: Save Feedback Entry
+
+    Note over UI,FeedbackLogger: (Optional future step)\nTrigger adaptation based on feedback log
