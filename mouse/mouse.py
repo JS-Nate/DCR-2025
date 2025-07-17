@@ -4,26 +4,32 @@ import csv
 import threading
 from pynput import mouse, keyboard
 import matplotlib.pyplot as plt
+from datetime import datetime
+
+# === Prompt for scenario name and generate CSV filename ===
+scenario_name = input("Enter a name for this mouse tracking session: ").strip().replace(" ", "_")
+timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+csv_filename = f"mouse_detection-{scenario_name}-{timestamp}.csv"
 
 mouse_data = []
-stop_flag = False  # Global flag for stopping
+stop_flag = False
 
 def on_move(x, y):
     if stop_flag:
-        return False  # Stop mouse listener
+        return False
     timestamp = time.time()
     mouse_data.append((timestamp, x, y))
     print(f"Moved to ({x}, {y}) at {timestamp:.2f}")
 
 def on_click(x, y, button, pressed):
-    return not stop_flag  # End mouse listener if flag is set
+    return not stop_flag
 
 def on_press(key):
     global stop_flag
     if key == keyboard.Key.esc:
         print("\nEscape pressed. Stopping...")
         stop_flag = True
-        return False  # Stop keyboard listener
+        return False
 
 def compute_speed(data):
     speeds = []
@@ -105,7 +111,7 @@ def plot_results(data, speeds, times):
     plt.tight_layout()
     plt.show()
 
-def save_to_csv(data, speeds, jerkiness, idle_count, micro_moves, filename="mouse_stress_data.csv"):
+def save_to_csv(data, speeds, jerkiness, idle_count, micro_moves, filename):
     with open(filename, mode='w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['Timestamp', 'X', 'Y', 'Speed'])
@@ -128,11 +134,9 @@ def save_to_csv(data, speeds, jerkiness, idle_count, micro_moves, filename="mous
 
 print("Tracking mouse movement... (Press ESC to stop)")
 
-# Run keyboard listener in a separate thread
 keyboard_listener = keyboard.Listener(on_press=on_press)
 keyboard_listener.start()
 
-# Mouse listener (runs in main thread, but checks stop_flag)
 with mouse.Listener(on_move=on_move, on_click=on_click) as mouse_listener:
     while not stop_flag:
         time.sleep(0.1)
@@ -155,7 +159,7 @@ if len(mouse_data) > 2:
     print(f"Micro Movements (<3px): {micro_moves}")
 
     plot_results(mouse_data, speeds, times)
-    save_to_csv(mouse_data, speeds, jerkiness, idle_count, micro_moves)
+    save_to_csv(mouse_data, speeds, jerkiness, idle_count, micro_moves, csv_filename)
 
 else:
     print("Not enough data to analyze.")
