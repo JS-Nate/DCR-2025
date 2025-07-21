@@ -1,0 +1,43 @@
+flowchart TD
+    subgraph Inputs
+        A1[Human State Data]
+        A2[Environment Data]
+        A3[Task Context]
+    end
+
+    subgraph Core Functions
+        B1[🧠 Human State Monitoring]
+        B2[🌡️ Environment Awareness]
+        B3[⚖️ Performance Scoring]
+        B4[🧾 LLaMA Feedback Engine]
+        B5[📊 UI & Visualization]
+        B6[🔁 Feedback Logging]
+    end
+
+    subgraph Outputs
+        C1[Operator Dashboard]
+        C2[Alert Notifications]
+        C3[Performance Reports]
+        C4[AI Feedback Summary]
+    end
+
+    subgraph Adaptation Loop
+        D1[Feedback Capture]
+        D2[Performance Change Analysis]
+        D3[Guidance Adjustment]
+    end
+
+    A1 --> B1
+    A2 --> B2
+    A3 --> B3
+    B1 --> B3
+    B2 --> B3
+    B3 --> B4
+    B3 --> B5
+    B4 --> C4
+    B5 --> C1
+    B3 --> C3
+    B3 --> C2
+    C1 --> D1
+    D1 --> D2 --> D3 --> B4
+    D3 --> B3

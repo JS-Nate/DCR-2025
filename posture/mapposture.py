@@ -2,7 +2,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 col_names = ['Index', 'Val1', 'Val2', 'Val3', 'Val4', 'Val5', 'Val6', 'Val7', 'Val8', 'Posture']
-df = pd.read_csv('C:/Users/natt4/Documents/GitHub/Summer2025/posture/posture_readings.csv', names=col_names, header=None)
+df = pd.read_csv('C:/Users/natt4/Documents/GitHub/Summer2025/posture/posture_detection-another-2025-07-17_16-07-28.csv', names=col_names, header=None)
 
 # Remove any accidental header rows (case insensitive)
 df = df[~df['Posture'].str.lower().eq('posture')]
