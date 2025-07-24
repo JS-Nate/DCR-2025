@@ -14,7 +14,7 @@ Follow these steps to get started:
 2. **Navigate to the project folder:**
 
    ```bash
-   cd Summer2025/smr_hpms
+   cd Summer2025/hpms
    ```
 
 3. **(Optional) Create and activate a virtual environment:**
