@@ -2,7 +2,6 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import csv
-import os
 from datetime import datetime
 
 # === Prompt for scenario name ===
@@ -20,7 +19,8 @@ csv_writer = csv.writer(csv_file)
 csv_writer.writerow([
     "frame", "left_shoulder_x", "left_shoulder_y",
     "right_shoulder_x", "right_shoulder_y",
-    "nose_x", "nose_y", "shoulder_diff", "head_forward", "posture"
+    "nose_x", "nose_y", "shoulder_diff", "head_forward", "posture",
+    "movement_amount", "movement_status"
 ])
 
 # === Define posture evaluation function ===
@@ -49,6 +49,10 @@ def evaluate_posture(landmarks):
 cap = cv2.VideoCapture(0)
 frame_count = 0
 
+# === Initialize previous frame landmarks
+prev_ls = prev_rs = prev_nose = None
+movement_threshold = 0.01  # You can tune this value
+
 with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
     while cap.isOpened():
         ret, frame = cap.read()
@@ -64,20 +68,41 @@ with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as 
             mp_drawing.draw_landmarks(
                 image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
+            # === Evaluate posture
             posture, ls, rs, nose_np, shoulder_diff, head_forward = evaluate_posture(results.pose_landmarks.landmark)
 
-            cv2.putText(image, f"Posture: {posture}", (10, 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0) if "Good" in posture else (0, 0, 255), 2)
+            # === Track movement
+            movement = 0
+            if prev_ls is not None and prev_rs is not None and prev_nose is not None:
+                movement += np.linalg.norm(ls - prev_ls)
+                movement += np.linalg.norm(rs - prev_rs)
+                movement += np.linalg.norm(nose_np - prev_nose)
 
+                movement_status = "Moving" if movement > movement_threshold else "Still"
+            else:
+                movement_status = "Unknown"
+
+            prev_ls, prev_rs, prev_nose = ls, rs, nose_np
+
+            # === Display posture and movement on frame
+            cv2.putText(image, f"Posture: {posture}", (10, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1,
+                        (0, 255, 0) if "Good" in posture else (0, 0, 255), 2)
+
+            cv2.putText(image, f"Movement: {movement_status}", (10, 70),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+
+            # === Log to CSV
             csv_writer.writerow([
                 frame_count,
                 ls[0], ls[1],
                 rs[0], rs[1],
                 nose_np[0], nose_np[1],
-                shoulder_diff, head_forward, posture
+                shoulder_diff, head_forward, posture,
+                movement, movement_status
             ])
 
-        cv2.imshow('Posture Tracker', image)
+        cv2.imshow('Posture & Movement Tracker', image)
         if cv2.waitKey(10) & 0xFF == ord('q'):
             break
 

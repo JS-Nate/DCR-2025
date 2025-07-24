@@ -1,0 +1,31 @@
+flowchart LR
+    subgraph Physiological_Inputs
+        HR[Heart Rate]
+        EEG[EEG Pattern]
+        Emotion[Facial Emotion]
+    end
+
+    subgraph Environmental_Inputs
+        Temp[Room Temperature]
+        Light["Lighting (Temp and Intensity)"]
+        Noise[Noise / Distractions]
+    end
+
+    subgraph Task_Context
+        Task[Task Type]
+        Complexity[Task Difficulty]
+    end
+
+    HR --> CP[Coupling Processor]
+    EEG --> CP
+    Emotion --> CP
+
+    Temp --> CP
+    Light --> CP
+    Noise --> CP
+
+    Task --> CP
+    Complexity --> CP
+
+    CP --> RiskEval[Coupled Risk Score]
+    RiskEval --> ScoreOutput[Performance Scoring / Alert Trigger]
