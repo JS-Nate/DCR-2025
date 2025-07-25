@@ -1,42 +1,66 @@
-import re
+import csv
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
-# Parse the CSV
+# --- Step 1: List available CSV files and select one ---
+csv_folder = "mouse"  # Folder containing CSV files
+csv_files = [f for f in os.listdir(csv_folder) if f.endswith(".csv")]
+
+if not csv_files:
+    raise FileNotFoundError("No CSV files found in the 'mouse' folder.")
+
+print("Available CSV files:")
+for i, file in enumerate(csv_files):
+    print(f"{i + 1}. {file}")
+
+# Ask the user to choose a file
+choice = int(input("Enter the number of the CSV file to use: ")) - 1
+
+if choice < 0 or choice >= len(csv_files):
+    raise ValueError("Invalid file selection.")
+
+selected_csv = os.path.join(csv_folder, csv_files[choice])
+print(f"\nLoading data from: {selected_csv}")
+
+# --- Step 2: Load and parse CSV data ---
 positions = []
 timestamps = []
 
-with open("mouse/mouse_stress_data.csv", "r") as f:
-    for line in f:
-        match = re.match(r"Moved to \(([-\d]+), ([-\d]+)\) at ([\d\.]+)", line)
-        if match:
-            x, y, t = int(match.group(1)), int(match.group(2)), float(match.group(3))
+with open(selected_csv, "r") as f:
+    reader = csv.DictReader(f)
+    for row in reader:
+        if not row["X"] or not row["Y"] or not row["Timestamp"]:
+            continue
+        try:
+            x = int(row["X"])
+            y = int(row["Y"])
+            t = float(row["Timestamp"])
             positions.append((x, y))
             timestamps.append(t)
+        except (ValueError, KeyError, TypeError):
+            continue
 
 positions = np.array(positions)
 timestamps = np.array(timestamps)
 
-# Calculate speed (pixels/sec) and direction change (radians)
+# --- Step 3: Calculate movement features ---
 dx = np.diff(positions[:, 0])
 dy = np.diff(positions[:, 1])
 dt = np.diff(timestamps)
-speed = np.hypot(dx, dy) / np.where(dt == 0, 1e-6, dt)  # avoid division by zero
+speed = np.hypot(dx, dy) / np.where(dt == 0, 1e-6, dt)
 
-# Direction (angle in radians)
 angles = np.arctan2(dy, dx)
 d_angle = np.abs(np.diff(angles))
-d_angle = np.where(d_angle > np.pi, 2 * np.pi - d_angle, d_angle)  # wrap-around
+d_angle = np.where(d_angle > np.pi, 2 * np.pi - d_angle, d_angle)
 
-# Heuristics for stress markers
-ERRATIC_SPEED = np.percentile(speed, 90)  # top 10% speed
-ERRATIC_ANGLE = np.percentile(d_angle, 90)  # top 10% direction change
-SLOW_SPEED = np.percentile(speed, 10)  # bottom 10% speed
+ERRATIC_SPEED = np.percentile(speed, 90)
+ERRATIC_ANGLE = np.percentile(d_angle, 90)
+SLOW_SPEED = np.percentile(speed, 10)
 
-# Find erratic movement (either high speed or high direction change)
 erratic_speed_idx = np.where(speed > ERRATIC_SPEED)[0]
 erratic_angle_idx = np.where(d_angle > ERRATIC_ANGLE)[0]
-erratic_idx = np.unique(np.concatenate([erratic_speed_idx, erratic_angle_idx + 1]))  # shift angle index to match position
+erratic_idx = np.unique(np.concatenate([erratic_speed_idx, erratic_angle_idx + 1]))
 
 slow_idx = np.where(speed < SLOW_SPEED)[0]
 
@@ -95,7 +119,7 @@ plt.show()
 
 # --- Plot 5: Line Progression Graph of Cumulative Distance ---
 cumulative_distance = np.cumsum(np.hypot(dx, dy))
-timestamps_mid = (timestamps[1:] + timestamps[:-1]) / 2  # midpoint for each segment
+timestamps_mid = (timestamps[1:] + timestamps[:-1]) / 2
 
 plt.figure(figsize=(12, 5))
 plt.plot(timestamps_mid, cumulative_distance, label="Cumulative Distance", color="purple")
