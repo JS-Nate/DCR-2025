@@ -1,0 +1,120 @@
+{
+  "Inadvertent ADS Initiation": [
+    "Reactor Trip",
+    "ADS Actuation",
+    "Gen Breaker Open",
+    "Turbine Trip",
+    "PIS -> Emergency",
+    "ADS -> Emergency",
+    "GIS -> Emergency",
+    "TUR -> Decelerating",
+    "Gen -> No Sync",
+    "RCS -> Trip"
+  ],
+  "Loss of Containment Vacuum": [
+    "High CBS Pressure",
+    "Low CNR Pressure"
+  ],
+  "Condenser Coolant Pump Trip": [
+    "Reactor Trip",
+    "Turbine Trip",
+    "Setback",
+    "Stepback",
+    "PDHR Actuation",
+    "MSS Isolation",
+    "FWS Isolation",
+    "Low CNR Vacuum",
+    "Gen Breaker Open",
+    "PDHR -> On",
+    "FWS -> Isolated",
+    "CNR -> No Vacuum",
+    "RCS -> Trip"
+  ],
+  "Inadvertent Initiation of Decay Heat Removal System": [
+    "Reactor Trip",
+    "Turbine Trip",
+    "PDHR Actuation",
+    "FWS Isolation",
+    "Gen Breaker Open",
+    "PDHR -> ON",
+    "RCS -> Trip",
+    "FWS -> Isolated"
+  ],
+  "Reduction in FW Temperature": [
+    "Stepback"
+  ],
+  "FW System Pipe Break": [
+    "Low Steam Pressure"
+  ],
+  "Turbine Spurious Trip": [
+    "Stepback",
+    "Turbine Trip",
+    "Gen Breaker Open",
+    "TUR -> Decelerating",
+    "GEN -> No Sync"
+  ],
+  "FW Pump Trip": [
+    "Reactor Trip",
+    "Turbine Trip",
+    "FWS Isolation",
+    "Gen Breaker Open",
+    "PDHR -> ON",
+    "RCS -> Trip",
+    "FWS -> Isolated"
+  ],
+  "Station Blackout": [
+    "Reactor Trip",
+    "Turbine Trip",
+    "MSS Isolation",
+    "FWS Isolation",
+    "PDHR Actuation",
+    "Gen Breaker Open",
+    "Low RCS Pressure",
+    "PDHR -> ON",
+    "RCS -> Trip",
+    "Turbine -> Decelerating"
+  ],
+  "Steam Header Break": [
+    "Reactor Trip",
+    "Turbine Trip",
+    "MSS Isolation",
+    "FWS Isolation",
+    "PDHR Actuation",
+    "Gen Breaker Open",
+    "Low RCS Pressure",
+    "PDHR -> ON",
+    "RCS -> Trip",
+    "Turbine -> Decelerating",
+    "MSS -> Isolated",
+    "FWS -> Isolated"
+  ],
+  "Steam Generator Tube Failure": [
+    "Reactor Trip",
+    "Turbine Trip",
+    "Gen Breaker Open",
+    "Low RCS Pressure",
+    "RCS -> Trip",
+    "TUR -> Decelerating"
+  ],
+  "Major Steam System Piping Failure with Containment": [
+    "Reactor Trip",
+    "ADS Actuation",
+    "Turbine Trip",
+    "PDHR Actuation",
+    "Low Steam Pressure",
+    "Gen Breaker Open",
+    "High CBS Pressure",
+    "FWS Isolation",
+    "PIS -> Emergency",
+    "CBS -> Emergency",
+    "CCS -> Emergency",
+    "GIS -> Emergency",
+    "ADS -> Emergency",
+    "MSS -> Isolated",
+    "FWS -> Isolated",
+    "PDHR -> On",
+    "RCS -> Trip",
+    "GEN -> No Sync",
+    "TUR -> Decelerating"
+  ]
+}
