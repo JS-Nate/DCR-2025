@@ -1,0 +1,282 @@
+[
+    {
+        "name": "Reactor Trip",
+        "region": [
+            7,
+            90,
+            175,
+            42
+        ],
+        "type": "color"
+    },
+    {
+        "name": "Setback",
+        "region": [
+            185,
+            93,
+            173,
+            40
+        ],
+        "type": "color"
+    },
+    {
+        "name": "ADS actuation",
+        "region": [
+            362,
+            91,
+            174,
+            39
+        ],
+        "type": "color"
+    },
+    {
+        "name": "Rods in manual",
+        "region": [
+            540,
+            90,
+            174,
+            43
+        ],
+        "type": "color"
+    },
+    {
+        "name": "MSS isolation",
+        "region": [
+            718,
+            96,
+            171,
+            36
+        ],
+        "type": "color"
+    },
+    {
+        "name": "Low CNR vacuum",
+        "region": [
+            895,
+            94,
+            172,
+            37
+        ],
+        "type": "color"
+    },
+    {
+        "name": "Turning gear",
+        "region": [
+            1071,
+            93,
+            173,
+            37
+        ],
+        "type": "color"
+    },
+    {
+        "name": "Turbine trip",
+        "region": [
+            1250,
+            92,
+            171,
+            40
+        ],
+        "type": "color"
+    },
+    {
+        "name": "Low RCS pressure",
+        "region": [
+            9,
+            141,
+            171,
+            37
+        ],
+        "type": "color"
+    },
+    {
+        "name": "Stepback",
+        "region": [
+            189,
+            142,
+            170,
+            34
+        ],
+        "type": "color"
+    },
+    {
+        "name": "PDHR actuation",
+        "region": [
+            367,
+            143,
+            168,
+            34
+        ],
+        "type": "color"
+    },
+    {
+        "name": "High CBS pressure",
+        "region": [
+            543,
+            143,
+            168,
+            35
+        ],
+        "type": "color"
+    },
+    {
+        "name": "FWS isolation",
+        "region": [
+            719,
+            143,
+            168,
+            34
+        ],
+        "type": "color"
+    },
+    {
+        "name": "Low steam pressure",
+        "region": [
+            899,
+            145,
+            165,
+            32
+        ],
+        "type": "color"
+    },
+    {
+        "name": "Gen breaker open",
+        "region": [
+            1075,
+            144,
+            166,
+            31
+        ],
+        "type": "color"
+    },
+    {
+        "name": "Runback",
+        "region": [
+            1251,
+            144,
+            168,
+            35
+        ],
+        "type": "color"
+    },
+    {
+        "name": "PHDR",
+        "region": [
+            672,
+            292,
+            139,
+            93
+        ],
+        "type": "text"
+    },
+    {
+        "name": "GEN",
+        "region": [
+            1680,
+            276,
+            95,
+            80
+        ],
+        "type": "text"
+    },
+    {
+        "name": "PIS",
+        "region": [
+            375,
+            345,
+            174,
+            89
+        ],
+        "type": "text"
+    },
+    {
+        "name": "ADS",
+        "region": [
+            643,
+            588,
+            179,
+            87
+        ],
+        "type": "text"
+    },
+    {
+        "name": "TUR",
+        "region": [
+            1327,
+            575,
+            204,
+            71
+        ],
+        "type": "text"
+    },
+    {
+        "name": "CNR",
+        "region": [
+            1634,
+            573,
+            197,
+            68
+        ],
+        "type": "text"
+    },
+    {
+        "name": "CCS",
+        "region": [
+            376,
+            742,
+            176,
+            79
+        ],
+        "type": "text"
+    },
+    {
+        "name": "GIS",
+        "region": [
+            644,
+            803,
+            177,
+            78
+        ],
+        "type": "text"
+    },
+    {
+        "name": "FWS",
+        "region": [
+            1326,
+            801,
+            205,
+            75
+        ],
+        "type": "text"
+    },
+    {
+        "name": "CWS",
+        "region": [
+            1613,
+            787,
+            202,
+            85
+        ],
+        "type": "text"
+    },
+    {
+        "name": "MSS",
+        "region": [
+            1324,
+            272,
+            204,
+            78
+        ],
+        "type": "text"
+    },
+    {
+        "name": "RCS",
+        "region": [
+            916,
+            536,
+            313,
+            93
+        ],
+        "type": "text"
+    }
+]
