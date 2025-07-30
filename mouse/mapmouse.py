@@ -4,7 +4,7 @@ import numpy as np
 import os
 
 # --- Step 1: List available CSV files and select one ---
-csv_folder = "mouse"  # Folder containing CSV files
+csv_folder = os.path.dirname(os.path.abspath(__file__))
 csv_files = [f for f in os.listdir(csv_folder) if f.endswith(".csv")]
 
 if not csv_files:

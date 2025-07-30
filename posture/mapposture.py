@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import os
 
 # --- Step 1: Select a CSV from the posture directory ---
-csv_folder = "posture"
+csv_folder = os.path.dirname(os.path.abspath(__file__))
 csv_files = [f for f in os.listdir(csv_folder) if f.endswith(".csv")]
 
 if not csv_files:

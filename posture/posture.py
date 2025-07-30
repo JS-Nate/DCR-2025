@@ -2,12 +2,16 @@ import cv2
 import mediapipe as mp
 import numpy as np
 import csv
+import os
 from datetime import datetime
 
 # === Prompt for scenario name ===
 scenario_name = input("Enter the scenario name for this posture detection session: ").strip().replace(" ", "_")
 timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-csv_filename = f"posture_detection-{scenario_name}-{timestamp}.csv"
+
+# Ensure CSV is saved in the same directory as this script
+script_dir = os.path.dirname(os.path.abspath(__file__))
+csv_filename = os.path.join(script_dir, f"posture_detection-{scenario_name}-{timestamp}.csv")
 
 # === Initialize MediaPipe pose ===
 mp_drawing = mp.solutions.drawing_utils
