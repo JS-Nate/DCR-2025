@@ -17,9 +17,10 @@ stop_flag = False
 def on_move(x, y):
     if stop_flag:
         return False
-    timestamp = time.time()
-    mouse_data.append((timestamp, x, y))
-    print(f"Moved to ({x}, {y}) at {timestamp:.2f}")
+    # Change here: Use datetime.now() with formatting instead of time.time()
+    timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]  # Millisecond precision
+    mouse_data.append((timestamp_str, x, y))
+    print(f"Moved to ({x}, {y}) at {timestamp_str}")
 
 def on_click(x, y, button, pressed):
     return not stop_flag
@@ -34,10 +35,12 @@ def on_press(key):
 def compute_speed(data):
     speeds = []
     times = []
+    # Convert timestamp strings to datetime objects for calculations
+    timestamps_dt = [datetime.strptime(t, "%Y-%m-%d %H:%M:%S.%f") for t, _, _ in data]
     for i in range(1, len(data)):
-        t1, x1, y1 = data[i - 1]
-        t2, x2, y2 = data[i]
-        dt = t2 - t1
+        t1, x1, y1 = timestamps_dt[i - 1], data[i - 1][1], data[i - 1][2]
+        t2, x2, y2 = timestamps_dt[i], data[i][1], data[i][2]
+        dt = (t2 - t1).total_seconds()
         if dt == 0:
             continue
         dist = math.hypot(x2 - x1, y2 - y1)
@@ -71,10 +74,11 @@ def compute_jerkiness(data):
 
 def compute_idle_time(data, threshold=2):
     idle_periods = 0
+    timestamps_dt = [datetime.strptime(t, "%Y-%m-%d %H:%M:%S.%f") for t, _, _ in data]
     for i in range(1, len(data)):
-        t1, x1, y1 = data[i - 1]
-        t2, x2, y2 = data[i]
-        if math.hypot(x2 - x1, y2 - y1) < 1.0 and (t2 - t1) > threshold:
+        t1, x1, y1 = timestamps_dt[i - 1], data[i - 1][1], data[i - 1][2]
+        t2, x2, y2 = timestamps_dt[i], data[i][1], data[i][2]
+        if math.hypot(x2 - x1, y2 - y1) < 1.0 and (t2 - t1).total_seconds() > threshold:
             idle_periods += 1
     return idle_periods
 
@@ -103,9 +107,12 @@ def plot_results(data, speeds, times):
 
     plt.subplot(1, 2, 2)
     if speeds:
-        plt.plot(times[1:], speeds[1:], color='orange')
+        # Convert times (datetime) to elapsed seconds from start for plotting
+        start_time = times[0]
+        elapsed = [(t - start_time).total_seconds() for t in times]
+        plt.plot(elapsed[1:], speeds[1:], color='orange')
         plt.title('Mouse Speed Over Time')
-        plt.xlabel('Time')
+        plt.xlabel('Time (seconds)')
         plt.ylabel('Speed (pixels/sec)')
 
     plt.tight_layout()

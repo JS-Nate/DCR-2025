@@ -2,21 +2,20 @@ import csv
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+from datetime import datetime
 
 # --- Step 1: List available CSV files and select one ---
 csv_folder = os.path.dirname(os.path.abspath(__file__))
 csv_files = [f for f in os.listdir(csv_folder) if f.endswith(".csv")]
 
 if not csv_files:
-    raise FileNotFoundError("No CSV files found in the 'mouse' folder.")
+    raise FileNotFoundError("No CSV files found in the directory.")
 
 print("Available CSV files:")
 for i, file in enumerate(csv_files):
     print(f"{i + 1}. {file}")
 
-# Ask the user to choose a file
 choice = int(input("Enter the number of the CSV file to use: ")) - 1
-
 if choice < 0 or choice >= len(csv_files):
     raise ValueError("Invalid file selection.")
 
@@ -35,7 +34,9 @@ with open(selected_csv, "r") as f:
         try:
             x = int(row["X"])
             y = int(row["Y"])
-            t = float(row["Timestamp"])
+            # Parse timestamp string to datetime object
+            # Adjust the format to match your timestamp string
+            t = datetime.strptime(row["Timestamp"], "%Y-%m-%d %H:%M:%S.%f")
             positions.append((x, y))
             timestamps.append(t)
         except (ValueError, KeyError, TypeError):
@@ -44,10 +45,13 @@ with open(selected_csv, "r") as f:
 positions = np.array(positions)
 timestamps = np.array(timestamps)
 
+# Convert datetime timestamps to elapsed seconds from the first timestamp
+elapsed_seconds = np.array([(t - timestamps[0]).total_seconds() for t in timestamps])
+
 # --- Step 3: Calculate movement features ---
 dx = np.diff(positions[:, 0])
 dy = np.diff(positions[:, 1])
-dt = np.diff(timestamps)
+dt = np.diff(elapsed_seconds)
 speed = np.hypot(dx, dy) / np.where(dt == 0, 1e-6, dt)
 
 angles = np.arctan2(dy, dx)
@@ -93,11 +97,11 @@ plt.show()
 
 # --- Plot 3: Line Graph of Speed Over Time ---
 plt.figure(figsize=(12, 5))
-plt.plot(timestamps[1:], speed, label="Speed (pixels/sec)", color="green")
+plt.plot(elapsed_seconds[1:], speed, label="Speed (pixels/sec)", color="green")
 plt.axhline(ERRATIC_SPEED, color='red', linestyle='--', label="Erratic Threshold")
 plt.axhline(SLOW_SPEED, color='blue', linestyle='--', label="Slow Threshold")
 plt.title("Mouse Speed Over Time")
-plt.xlabel("Timestamp")
+plt.xlabel("Time (seconds from start)")
 plt.ylabel("Speed (pixels/sec)")
 plt.legend()
 plt.grid(True)
@@ -119,12 +123,12 @@ plt.show()
 
 # --- Plot 5: Line Progression Graph of Cumulative Distance ---
 cumulative_distance = np.cumsum(np.hypot(dx, dy))
-timestamps_mid = (timestamps[1:] + timestamps[:-1]) / 2
+timestamps_mid = (elapsed_seconds[1:] + elapsed_seconds[:-1]) / 2
 
 plt.figure(figsize=(12, 5))
 plt.plot(timestamps_mid, cumulative_distance, label="Cumulative Distance", color="purple")
 plt.title("Cumulative Mouse Movement Over Time")
-plt.xlabel("Timestamp")
+plt.xlabel("Time (seconds from start)")
 plt.ylabel("Total Distance Moved (pixels)")
 plt.grid(True)
 plt.legend()
