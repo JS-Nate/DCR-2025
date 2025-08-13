@@ -183,14 +183,7 @@ if uploaded_file:
     else:
         st.success("No recent performance alerts.")
 
-    # ----------------- TRENDS -----------------
-    st.markdown("### Operator Trend Plots")
-    emotion_map = {"happy": 1, "neutral": 2, "surprised": 3, "sad": 4, "fear": 5, "angry": 6}
-    df['emotion_numeric'] = df['face_emotion'].str.lower().map(emotion_map)
-
-    st.line_chart(df.set_index('timestamp')[['heart_rate', 'room_temp']])
-    st.line_chart(df.set_index('timestamp')[['emotion_numeric']].rename(columns={'emotion_numeric': 'Emotion (coded)'}))
-
+   
     with st.expander("ℹ Emotion Code Legend"):
         st.markdown("1=happy, 2=neutral, 3=surprised, 4=sad, 5=fear, 6=angry")
 
