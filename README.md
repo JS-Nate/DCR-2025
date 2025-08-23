@@ -43,7 +43,7 @@ Summer2025/
 ├── ... (other project files and folders)
 │  
 │  
-├── smr_hpms/
+├── hpms/
 │   ├── streamlit_app.py
 │   └── ... (other project files)
 │
@@ -52,6 +52,6 @@ Summer2025/
 
 ## Notes
 
-* Requires **Python 3.8+**.
+* This system was tested with Python 3.12, you can download from the microsoft store
 * Make sure [Streamlit](https://streamlit.io/) and other dependencies in `requirements.txt` are installed.
 * If you encounter issues, ensure you're in the correct folder and the environment is set up correctly.
