@@ -52,6 +52,6 @@ Summer2025/
 
 ## Notes
 
-* This system was tested with Python 3.12, you can download from the microsoft store
+* This system was tested with Python 3.12, you can download from the [Microsoft Store](https://apps.microsoft.com/detail/9ncvdn91xzqp?hl=en-US&gl=US)
 * Make sure [Streamlit](https://streamlit.io/) and other dependencies in `requirements.txt` are installed.
 * If you encounter issues, ensure you're in the correct folder and the environment is set up correctly.
