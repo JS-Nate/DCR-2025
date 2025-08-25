@@ -63,7 +63,7 @@ def analyze_chunk(audio_chunk_path):
         "Text": text
     }
 
-def process_audio(input_file, chunk_length_ms=6000, report_name="report1v2"):
+def process_audio(input_file, chunk_length_ms=6000, report_name="final4"):
     audio = AudioSegment.from_file(input_file)
     chunks = make_chunks(audio, chunk_length_ms)
     
@@ -141,6 +141,6 @@ def choose_audio_file():
 # Use it in your script like this:
 chosen_file = choose_audio_file()
 if chosen_file:
-    process_audio(chosen_file, chunk_length_ms=6000, report_name="report1v2")
+    process_audio(chosen_file, chunk_length_ms=6000, report_name="final4")
 else:
     print("No file selected. Exiting.")

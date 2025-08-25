@@ -1,25 +1,31 @@
-# Updated analysis.py for new HPMS inputs (v2)
-SAFETY_MARGINS = {
+# analysis.py  (updated to align with streamlit_app.py + HPSN)
+from __future__ import annotations
+from typing import Dict, Tuple, List, Any
+
+# ----------------------------- Constants -----------------------------
+
+SAFETY_MARGINS: Dict[str, Any] = {
     "1.1_heart_rate": {"min": 60, "max": 100},
     "1.2_skin_temp": {"min": 32.0, "max": 36.0},
     "1.3_face_emotion": {
-        "safe": ["happy", "neutral"],
+        "safe":    ["happy", "neutral"],
         "warning": ["surprised"],
-        "danger": ["sad", "fear", "angry"]
+        "danger":  ["sad", "fear", "angry"],
     },
     "1.4_face_stress": {
-        "safe": ["low"],
+        "safe":    ["low"],
         "warning": ["medium"],
-        "danger": ["high"]
+        "danger":  ["high"],
     },
-    "2.1_room_temp": {"min": 21, "max": 28},
-    "2.2_cct_temp": {"min": 4500, "max": 5500},
+    "2.1_room_temp":       {"min": 21, "max": 28},
+    "2.2_cct_temp":        {"min": 4500, "max": 5500},
     "2.3_light_intensity": {"min": 300, "max": 1000},
-    "2.4_humidity": {"min": 30, "max": 60},
-    "2.5_pressure": {"min": 980, "max": 1020}
+    "2.4_humidity":        {"min": 30, "max": 60},
+    "2.5_pressure":        {"min": 980, "max": 1020},
 }
-# --- add near top of analysis.py ---
-PSF_WEIGHTS = {
+
+# Group weights used by compute_psf_loads()
+PSF_WEIGHTS: Dict[str, float] = {
     "physiological": 0.30,
     "behavioral":    0.20,
     "interaction":   0.20,
@@ -27,85 +33,151 @@ PSF_WEIGHTS = {
     "task_system":   0.10,
 }
 
-OUTPUT_WEIGHTS = {
+# Output components used by compute_output_score()
+OUTPUT_WEIGHTS: Dict[str, float] = {
     "task_success":          0.40,  # 0..1
     "inv_completion_time":   0.20,  # uses 1/seconds
     "decision_accuracy":     0.20,  # 0..1
     "operational_stability": 0.10,  # 0..1
     "situational_awareness": 0.10,  # 0..1
 }
-# --- NEW: normalization helpers ---
-def _clamp(x, lo, hi): 
-    try: x = float(x)
-    except: return lo
+
+# ----------------------------- Helpers ------------------------------
+
+_EMOTION_CODE_MAP = {
+    1: "happy", 2: "neutral", 3: "surprised",
+    4: "sad",   5: "fear",    6: "angry",
+}
+
+def _clamp(x: Any, lo: float, hi: float) -> float:
+    """Clamp x to [lo, hi], coercing to float when possible."""
+    try:
+        x = float(x)
+    except Exception:
+        return lo
     return max(lo, min(hi, x))
 
-def _norm(x, lo, hi):
+def _norm(x: Any, lo: float, hi: float) -> float:
+    """Normalize x to [0,1] given bounds [lo, hi]."""
     x = _clamp(x, lo, hi)
     return (x - lo) / (hi - lo + 1e-9)
 
-def _dev_from_target(x, target, span):
-    # 0 at target, ->1 when |x-target| >= span
-    try: x = float(x)
-    except: return 1.0
+def _dev_from_target(x: Any, target: float, span: float) -> float:
+    """0 at target; →1 when |x - target| >= span."""
+    try:
+        x = float(x)
+    except Exception:
+        return 1.0
     return min(abs(x - target) / (span + 1e-9), 1.0)
 
-# --- NEW: compute per-PSF loads from your current inputs ---
-def compute_psf_loads(hr, skin_temp, posture, eye_tracking, voice, 
-                      emotion, stress, room_temp, cct_temp, light_intensity, humidity, pressure, 
-                      task, task_duration, reactor_status="normal"):
-    # Physiological (0..1 higher = more load)
+def _to_lower_str(x: Any, default: str = "unknown") -> str:
+    """Convert value to lower-case string safely."""
+    try:
+        s = str(x).strip().lower()
+        return s if s else default
+    except Exception:
+        return default
+
+def _normalize_emotion(x: Any) -> str:
+    """Accepts string or int code (1..6) and returns canonical emotion string."""
+    try:
+        if isinstance(x, (int, float)) and int(x) in _EMOTION_CODE_MAP:
+            return _EMOTION_CODE_MAP[int(x)]
+    except Exception:
+        pass
+    return _to_lower_str(x, "neutral")
+
+# ------------------------- Core Calculations -------------------------
+
+def compute_psf_loads(
+    hr: Any,
+    skin_temp: Any,
+    posture: Any,
+    eye_tracking: Any,
+    voice: Any,
+    emotion: Any,
+    stress: Any,
+    room_temp: Any,
+    cct_temp: Any,
+    light_intensity: Any,
+    humidity: Any,
+    pressure: Any,
+    task: Any,
+    task_duration: Any,
+    reactor_status: Any = "normal",
+) -> Tuple[Dict[str, float], float]:
+    """
+    Compute per-group PSF load (0..1, higher = more load) and an overall input load score.
+    Returns: (per_group_loads: dict, input_load_score: float)
+    """
+    emotion_s = _normalize_emotion(emotion)
+    stress_s  = _to_lower_str(stress, "low")
+    posture_s = _to_lower_str(posture, "unknown")
+    eyes_s    = _to_lower_str(eye_tracking, "unknown")
+    voice_s   = _to_lower_str(voice, "unknown")
+    task_s    = _to_lower_str(task, "unknown")
+    reactor_s = _to_lower_str(reactor_status, "normal")
+
+    # Physiological
     physiological = {
-        "heart_rate": _norm(hr, 60, 120),  # tune ranges later
-        "facial_stress": 1.0 if str(stress).lower()=="high" else 0.5 if str(stress).lower()=="medium" else 0.0,
-        "emotion_negative": 1.0 if str(emotion).lower() in ["sad","fear","angry"] else 0.5 if str(emotion).lower()=="surprised" else 0.0,
-        # skin temp: deviation from optimal 34°C ±2
-        "skin_temp_dev": _dev_from_target(skin_temp, 34.0, 2.0),
+        "heart_rate":       _norm(hr, 60, 120),  # tune ranges as you collect data
+        "facial_stress":    1.0 if stress_s == "high" else 0.5 if stress_s == "medium" else 0.0,
+        "emotion_negative": 1.0 if emotion_s in ["sad", "fear", "angry"]
+                              else 0.5 if emotion_s == "surprised" else 0.0,
+        "skin_temp_dev":    _dev_from_target(skin_temp, 34.0, 2.0),  # ~34±2 °C comfort
     }
 
-    # Behavioral (proxy from your fields; refine when you have numeric streams)
+    # Behavioral (boolean-ish proxies for now)
     behavioral = {
-        "eye_tracking_anomaly": 0.5 if str(eye_tracking).lower() not in ["steady","normal","focused"] else 0.0,
-        "posture_instability": 0.5 if str(posture).lower() not in ["neutral","stable"] else 0.0,
+        "eye_tracking_anomaly": 0.5 if eyes_s not in ["steady", "normal", "focused"] else 0.0,
+        "posture_instability":  0.5 if posture_s not in ["neutral", "stable"] else 0.0,
     }
 
-    # Interaction (voice stress as proxy; add mouse patterns when available)
+    # Interaction
     interaction = {
-        "voice_stress": 0.5 if str(voice).lower() in ["strained","shaky","loud"] else 0.0,
+        "voice_stress": 0.5 if voice_s in ["strained", "shaky", "loud"] else 0.0,
     }
 
-    # Environmental (deviation from optimal)
+    # Environmental
     environmental = {
-        "temp_dev": _dev_from_target(room_temp, 24, 4),       # 20–28 comfy band
-        "cct_dev": _dev_from_target(cct_temp, 5000, 1000),    # 4–6k
-        "light_dev": 0.0 if 300 <= float(light_intensity) <= 1000 else 1.0,
-        "humidity_dev": _dev_from_target(humidity, 45, 15),   # 30–60 acceptable
+        "temp_dev":     _dev_from_target(room_temp, 24, 4),       # 20–28
+        "cct_dev":      _dev_from_target(cct_temp, 5000, 1000),   # 4k–6k
+        "light_dev":    0.0 if 300 <= float(_clamp(light_intensity, 0, 10_000)) <= 1000 else 1.0,
+        "humidity_dev": _dev_from_target(humidity, 45, 15),       # 30–60
         "pressure_dev": _dev_from_target(pressure, 1010, 20),
     }
 
     # Task/System
     task_system = {
-        "task_complexity": 0.6 if str(task).lower() in ["emergency_shutdown","diagnostic_fault","abnormal_ops"] else 0.3,
-        "task_duration_norm": _norm(task_duration, 30, 900),
-        "reactor_malfunction": 1.0 if str(reactor_status).lower()!="normal" else 0.0,
+        "task_complexity":   0.6 if task_s in ["emergency_shutdown", "diagnostic_fault", "abnormal_ops"] else 0.3,
+        "task_duration_norm": _norm(task_duration, 30, 900),      # 0 at 30s, 1 at 15m
+        "reactor_malfunction": 1.0 if reactor_s != "normal" else 0.0,
     }
 
-    # group averages
-    per_group = {
-        "physiological": sum(physiological.values()) / len(physiological),
-        "behavioral":    sum(behavioral.values())    / max(len(behavioral),1),
-        "interaction":   sum(interaction.values())   / max(len(interaction),1),
-        "environmental": sum(environmental.values()) / len(environmental),
-        "task_system":   sum(task_system.values())   / len(task_system),
+    # Group averages
+    per_group: Dict[str, float] = {
+        "physiological": sum(physiological.values()) / max(len(physiological), 1),
+        "behavioral":    sum(behavioral.values())    / max(len(behavioral),    1),
+        "interaction":   sum(interaction.values())   / max(len(interaction),   1),
+        "environmental": sum(environmental.values()) / max(len(environmental), 1),
+        "task_system":   sum(task_system.values())   / max(len(task_system),   1),
     }
 
-    input_load_score = sum(per_group[g]*PSF_WEIGHTS[g] for g in PSF_WEIGHTS)
-    return per_group, input_load_score
-# --- NEW: output scoring (uses optional CSV fields, with fallbacks) ---
-def compute_output_score(task_success=None, completion_time_s=None, decision_accuracy=None,
-                         operational_stability=None, situational_awareness=None, fallback_task_duration=None):
-    # Defaults if CSV doesn’t provide output fields yet
-    ts  = float(task_success) if task_success is not None else 1.0  # assume success if unknown
+    input_load_score = sum(per_group[g] * PSF_WEIGHTS[g] for g in PSF_WEIGHTS)
+    return per_group, float(input_load_score)
+
+def compute_output_score(
+    task_success: Any = None,
+    completion_time_s: Any = None,
+    decision_accuracy: Any = None,
+    operational_stability: Any = None,
+    situational_awareness: Any = None,
+    fallback_task_duration: Any = None,
+) -> float:
+    """
+    Compute an output-side score in [0,1] from optional fields (robust to missing data).
+    """
+    ts  = float(task_success) if task_success is not None else 1.0
     cts = float(completion_time_s) if completion_time_s is not None else float(fallback_task_duration or 120.0)
     da  = float(decision_accuracy) if decision_accuracy is not None else 0.8
     os_ = float(operational_stability) if operational_stability is not None else 0.8
@@ -114,111 +186,288 @@ def compute_output_score(task_success=None, completion_time_s=None, decision_acc
     inv_time = 1.0 / max(cts, 1.0)
 
     score = (
-        ts  * OUTPUT_WEIGHTS["task_success"] +
+        ts       * OUTPUT_WEIGHTS["task_success"] +
         inv_time * OUTPUT_WEIGHTS["inv_completion_time"] +
-        da  * OUTPUT_WEIGHTS["decision_accuracy"] +
-        os_ * OUTPUT_WEIGHTS["operational_stability"] +
-        sa  * OUTPUT_WEIGHTS["situational_awareness"]
+        da       * OUTPUT_WEIGHTS["decision_accuracy"] +
+        os_      * OUTPUT_WEIGHTS["operational_stability"] +
+        sa       * OUTPUT_WEIGHTS["situational_awareness"]
     )
-    # Clamp to [0,1]
-    return max(0.0, min(1.0, score))
-# --- NEW: final performance using Output/Input ---
-def compute_performance(per_group_loads, input_load_score, output_score, eps=1e-6):
+    return float(max(0.0, min(1.0, score)))
+
+def compute_performance(
+    per_group_loads: Dict[str, float],
+    input_load_score: float,
+    output_score: float,
+    eps: float = 1e-6,
+) -> Tuple[float, str]:
+    """
+    Performance = output_score / input_load_score (higher is better).
+    Returns: (perf_score, perf_state) where state ∈ {"normal","warning","critical"}.
+    """
     perf = output_score / max(input_load_score, eps)
-    # simple classification (tune later or make scenario-based)
     state = "normal" if perf >= 0.85 else "warning" if perf >= 0.70 else "critical"
-    return round(perf, 3), state
+    return round(float(perf), 3), state
 
+# --------------------------- Safety & Commands -----------------------
 
-def calculate_performance_score_legacy(hr, skin_temp, temp, task, emotion, stress,
-                                cct_temp, light_intensity, humidity, pressure):
+def calculate_performance_score_legacy(
+    hr: Any, skin_temp: Any, temp: Any, task: Any, emotion: Any, stress: Any,
+    cct_temp: Any, light_intensity: Any, humidity: Any, pressure: Any
+) -> float:
+    """
+    Legacy heuristic score in [0,1]. Kept for backwards-compat testing.
+    """
     score = 1.0
+    try:
+        if float(hr) > 110 or float(hr) < 50:
+            score -= 0.15
+    except Exception:
+        pass
 
-    if hr > 110 or hr < 50:
-        score -= 0.15
-    if skin_temp < 32.0 or skin_temp > 36.0:
+    try:
+        stf = float(skin_temp)
+        if stf < 32.0 or stf > 36.0:
+            score -= 0.05
+    except Exception:
         score -= 0.05
-    if emotion.lower() in ["sad", "fear", "angry"]:
+
+    emotion_s = _normalize_emotion(emotion)
+    if emotion_s in ["sad", "fear", "angry"]:
         score -= 0.05
-    if stress.lower() == "high":
+
+    stress_s = _to_lower_str(stress, "low")
+    if stress_s == "high":
         score -= 0.1
-    elif stress.lower() == "medium":
+    elif stress_s == "medium":
         score -= 0.05
 
-    if temp > 28 or temp < 20:
+    try:
+        tf = float(temp)
+        if tf > 28 or tf < 20:
+            score -= 0.05
+    except Exception:
         score -= 0.05
-    if not (4500 <= cct_temp <= 5500):
+
+    try:
+        cctf = float(cct_temp)
+        if not (4500 <= cctf <= 5500):
+            score -= 0.05
+    except Exception:
         score -= 0.05
-    if light_intensity < 300 or light_intensity > 1000:
+
+    try:
+        li = float(light_intensity)
+        if li < 300 or li > 1000:
+            score -= 0.05
+    except Exception:
         score -= 0.05
-    if humidity < 30 or humidity > 60:
+
+    try:
+        hum = float(humidity)
+        if hum < 30 or hum > 60:
+            score -= 0.05
+    except Exception:
         score -= 0.05
-    if pressure < 980 or pressure > 1020:
+
+    try:
+        p = float(pressure)
+        if p < 980 or p > 1020:
+            score -= 0.05
+    except Exception:
         score -= 0.05
 
     return round(max(0.0, min(score, 1.0)), 2)
 
-def check_safety_margins(hr, skin_temp, temp, emotion, stress, cct_temp, light_intensity, humidity, pressure):
-    status = []
+def check_safety_margins(
+    hr: Any,
+    skin_temp: Any,
+    temp: Any,
+    emotion: Any,
+    stress: Any,
+    cct_temp: Any,
+    light_intensity: Any,
+    humidity: Any,
+    pressure: Any,
+) -> List[Tuple[str, str, Any, str]]:
+    """
+    Returns a list of tuples: (ID, Parameter, Value, StatusText)
+    Signature matches the updated streamlit_app.py call order.
+    """
+    status: List[Tuple[str, str, Any, str]] = []
 
-    def margin(value, low, high, param, id):
-        if value < low:
-            return (id, param, value, f"⚠️ Below threshold (< {low})")
-        elif value > high:
-            return (id, param, value, f"🚨 Above threshold (> {high})")
+    def margin(value: Any, low: float, high: float, param: str, id_: str):
+        try:
+            v = float(value)
+        except Exception:
+            return (id_, param, value, f"⚠️ Invalid")
+        if v < low:
+            return (id_, param, v, f"⚠️ Below threshold (< {low})")
+        elif v > high:
+            return (id_, param, v, f"🚨 Above threshold (> {high})")
         else:
-            return (id, param, value, "✅ Normal")
+            return (id_, param, v, "✅ Normal")
 
-    status.append(margin(hr, 60, 100, "Heart Rate", "1.1"))
-    status.append(margin(skin_temp, 32.0, 36.0, "Skin Temperature", "1.2"))
+    # Physiological
+    status.append(margin(hr,         SAFETY_MARGINS["1.1_heart_rate"]["min"], SAFETY_MARGINS["1.1_heart_rate"]["max"], "Heart Rate",          "1.1"))
+    status.append(margin(skin_temp,  SAFETY_MARGINS["1.2_skin_temp"]["min"],  SAFETY_MARGINS["1.2_skin_temp"]["max"],  "Skin Temperature",     "1.2"))
 
-    if emotion.lower() in SAFETY_MARGINS["1.3_face_emotion"]["danger"]:
-        status.append(("1.3", "Emotion", emotion, "⚠️ Elevated Stress"))
-    elif emotion.lower() in SAFETY_MARGINS["1.3_face_emotion"]["warning"]:
-        status.append(("1.3", "Emotion", emotion, "⚠️ Caution"))
+    # Emotion (categorical)
+    emotion_s = _normalize_emotion(emotion)
+    if emotion_s in SAFETY_MARGINS["1.3_face_emotion"]["danger"]:
+        status.append(("1.3", "Emotion", emotion_s, "🚨 High-Risk Emotion"))
+    elif emotion_s in SAFETY_MARGINS["1.3_face_emotion"]["warning"]:
+        status.append(("1.3", "Emotion", emotion_s, "⚠️ Elevated Emotion"))
     else:
-        status.append(("1.3", "Emotion", emotion, "✅ Normal"))
+        status.append(("1.3", "Emotion", emotion_s, "✅ Normal"))
 
-    if stress.lower() in SAFETY_MARGINS["1.4_face_stress"]["danger"]:
-        status.append(("1.4", "Facial Stress", stress, "🚨 High Stress"))
-    elif stress.lower() in SAFETY_MARGINS["1.4_face_stress"]["warning"]:
-        status.append(("1.4", "Facial Stress", stress, "⚠️ Medium Stress"))
+    # Facial stress (categorical)
+    stress_s = _to_lower_str(stress, "low")
+    if stress_s in SAFETY_MARGINS["1.4_face_stress"]["danger"]:
+        status.append(("1.4", "Facial Stress", stress_s, "🚨 High Stress"))
+    elif stress_s in SAFETY_MARGINS["1.4_face_stress"]["warning"]:
+        status.append(("1.4", "Facial Stress", stress_s, "⚠️ Medium Stress"))
     else:
-        status.append(("1.4", "Facial Stress", stress, "✅ Normal"))
+        status.append(("1.4", "Facial Stress", stress_s, "✅ Normal"))
 
-    status.append(margin(temp, 21, 28, "Room Temperature", "2.1"))
-    status.append(margin(cct_temp, 4500, 5500, "CCT Temperature", "2.2"))
-    status.append(margin(light_intensity, 300, 1000, "Light Intensity (lux)", "2.3"))
-    status.append(margin(humidity, 30, 60, "Humidity (%)", "2.4"))
-    status.append(margin(pressure, 980, 1020, "Pressure (hPa)", "2.5"))
+    # Environmental
+    status.append(margin(temp,           SAFETY_MARGINS["2.1_room_temp"]["min"],       SAFETY_MARGINS["2.1_room_temp"]["max"],       "Room Temperature",     "2.1"))
+    status.append(margin(cct_temp,       SAFETY_MARGINS["2.2_cct_temp"]["min"],        SAFETY_MARGINS["2.2_cct_temp"]["max"],        "CCT Temperature",      "2.2"))
+    status.append(margin(light_intensity,SAFETY_MARGINS["2.3_light_intensity"]["min"], SAFETY_MARGINS["2.3_light_intensity"]["max"], "Light Intensity (lux)","2.3"))
+    status.append(margin(humidity,       SAFETY_MARGINS["2.4_humidity"]["min"],        SAFETY_MARGINS["2.4_humidity"]["max"],        "Humidity (%)",         "2.4"))
+    status.append(margin(pressure,       SAFETY_MARGINS["2.5_pressure"]["min"],        SAFETY_MARGINS["2.5_pressure"]["max"],        "Pressure (hPa)",       "2.5"))
 
     return status
 
-def generate_environment_commands(cct_temp=None, light_intensity=None, humidity=None, pressure=None):
-    cmds = []
 
-    if cct_temp is not None:
-        if cct_temp < 4500:
-            cmds.append("adjust_cct_temperature(5000)  # raise CCT")
-        elif cct_temp > 5500:
-            cmds.append("adjust_cct_temperature(5000)  # lower CCT")
 
-    if light_intensity is not None:
-        if light_intensity < 300:
-            cmds.append("increase_light_intensity(600)")
-        elif light_intensity > 1000:
-            cmds.append("decrease_light_intensity(800)")
+# ---------------- Physiological recommendations (fallback) ----------------
+def build_local_physiological_feedback(
+    hr: float,
+    skin_temp: float,
+    stress: str,
+    emotion: str,
+    posture: str,
+    eye_tracking: str,
+    voice: str,
+    humidity: float,
+) -> list[dict]:
+    """Rule-based suggestions if LLaMA is unavailable or returns invalid JSON."""
+    def _ls(x): return str(x).lower()
 
-    if humidity is not None:
-        if humidity < 30:
-            cmds.append("humidifier_on(target=40)")
-        elif humidity > 60:
-            cmds.append("dehumidifier_on(target=50)")
+    recs: list[dict] = []
 
-    if pressure is not None:
-        if pressure < 980:
-            cmds.append("adjust_pressure(1000)  # low pressure detected")
-        elif pressure > 1020:
-            cmds.append("adjust_pressure(1000)  # high pressure detected")
+    # HR / stress management
+    if (isinstance(hr, (int, float)) and hr > 100) or _ls(stress) in ("medium", "high"):
+        recs.append({
+            "label": "paced_breathing_60s",
+            "why": "Heart rate elevated and/or stress medium/high",
+            "how_to": "Inhale 4s, exhale 6s for 60s, seated, shoulders relaxed.",
+            "duration_s": 60,
+            "expected_effect": "Lower sympathetic arousal; HR trend down",
+            "monitor": "Recheck HR and stress label after 5–10 min",
+            "constraints": "Stop if dizzy; notify supervisor if symptoms persist"
+        })
+
+    # Eye fatigue
+    if _ls(eye_tracking) in ("blinking frequently", "distracted", "unsteady"):
+        recs.append({
+            "label": "visual_reset_20_20_20",
+            "why": "Eye fatigue indicators (blink/focus issues)",
+            "how_to": "Every 20 min, look 20 ft away for 20 s; blink deliberately.",
+            "duration_s": 20,
+            "expected_effect": "Reduce visual fatigue",
+            "monitor": "Blink comfort; fewer eye-tracking anomalies",
+            "constraints": "n/a"
+        })
+
+    # Posture / voice strain
+    if _ls(posture) not in ("neutral", "stable") or _ls(voice) in ("strained", "shaky", "loud"):
+        recs.append({
+            "label": "microbreak_posture_reset",
+            "why": "Posture/voice strain detected",
+            "how_to": "Stand 60s, shoulder rolls x6, gentle neck stretch.",
+            "duration_s": 60,
+            "expected_effect": "Reduce muscle tension, improve voice control",
+            "monitor": "Perceived effort ↓; voice strain ↓",
+            "constraints": "Avoid if balance is impaired"
+        })
+
+    # Hydration (dry air or voice strain)
+    if (isinstance(humidity, (int, float)) and humidity < 35) or _ls(voice) in ("strained",):
+        recs.append({
+            "label": "sip_water",
+            "why": "Dry air or voice strain",
+            "how_to": "Sip 50–100 ml water.",
+            "duration_s": 30,
+            "expected_effect": "Support thermoregulation and vocal clarity",
+            "monitor": "Voice strain ↓",
+            "constraints": "Follow site hydration rules"
+        })
+
+    # Skin temperature out of band
+    if isinstance(skin_temp, (int, float)) and (skin_temp < 32.0 or skin_temp > 36.0):
+        recs.append({
+            "label": "thermal_comfort_adjust",
+            "why": f"Skin temp {skin_temp:.1f} °C outside 32–36 °C",
+            "how_to": "If safe, adjust local airflow; relax tight PPE briefly.",
+            "duration_s": 60,
+            "expected_effect": "Move toward thermal comfort range",
+            "monitor": "Skin temp closer to 32–36 °C",
+            "constraints": "Only when operationally safe"
+        })
+
+    return recs
+
+
+def generate_environment_commands(
+    cct_temp: Any = None,
+    light_intensity: Any = None,
+    humidity: Any = None,
+    pressure: Any = None,
+) -> List[str]:
+    """
+    Produce simple environment adjustment suggestions based on current readings.
+    """
+    cmds: List[str] = []
+
+    try:
+        if cct_temp is not None:
+            cct = float(cct_temp)
+            if cct < SAFETY_MARGINS["2.2_cct_temp"]["min"]:
+                cmds.append("adjust_cct_temperature(5000)  # raise CCT")
+            elif cct > SAFETY_MARGINS["2.2_cct_temp"]["max"]:
+                cmds.append("adjust_cct_temperature(5000)  # lower CCT")
+    except Exception:
+        pass
+
+    try:
+        if light_intensity is not None:
+            lux = float(light_intensity)
+            if lux < SAFETY_MARGINS["2.3_light_intensity"]["min"]:
+                cmds.append("increase_light_intensity(600)")
+            elif lux > SAFETY_MARGINS["2.3_light_intensity"]["max"]:
+                cmds.append("decrease_light_intensity(800)")
+    except Exception:
+        pass
+
+    try:
+        if humidity is not None:
+            hum = float(humidity)
+            if hum < SAFETY_MARGINS["2.4_humidity"]["min"]:
+                cmds.append("humidifier_on(target=40)")
+            elif hum > SAFETY_MARGINS["2.4_humidity"]["max"]:
+                cmds.append("dehumidifier_on(target=50)")
+    except Exception:
+        pass
+
+    try:
+        if pressure is not None:
+            p = float(pressure)
+            if p < SAFETY_MARGINS["2.5_pressure"]["min"]:
+                cmds.append("adjust_pressure(1000)  # low pressure detected")
+            elif p > SAFETY_MARGINS["2.5_pressure"]["max"]:
+                cmds.append("adjust_pressure(1000)  # high pressure detected")
+    except Exception:
+        pass
 
     return cmds
