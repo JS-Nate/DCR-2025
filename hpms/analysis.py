@@ -305,7 +305,7 @@ def check_safety_margins(
         elif v > high:
             return (id_, param, v, f"🚨 Above threshold (> {high})")
         else:
-            return (id_, param, v, "✅ Normal")
+            return (id_, param, v, "✅")
 
     # Physiological
     status.append(margin(hr,         SAFETY_MARGINS["1.1_heart_rate"]["min"], SAFETY_MARGINS["1.1_heart_rate"]["max"], "Heart Rate",          "1.1"))

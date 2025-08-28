@@ -1,0 +1,4 @@
+timestamp,heart_rate,skin_temp,posture,eye_tracking,voice,face_emotion,face_stress,task,task_duration,room_temp,cct_temp,light_intensity,humidity,pressure
+2025-08-13T13:51:20.000000,100,27.5,slouching,focused,strained,fear,low,monitoring,5,23.7,3375,119,58,995.47
+2025-08-13T13:51:25.000000,100,27.5,slouching,focused,strained,fear,low,monitoring,5,23.7,3368,119,58,995.47
+2025-08-13T13:51:30.000000,100,27.5,slouching,focused,strained,neutral,low,monitoring,5,23.7,3364,119,58,995.46

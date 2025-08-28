@@ -1,0 +1,2 @@
+timestamp,temperature_C,pressure_hPa,humidity_%,light_lux,ambient_IR_K,skin_temperature_C,core_temperature_C,CCT_K,Heart Rate (bpm),rms,noise_level,Emotion Detection,Eye Detection,X,Y,Speed,left_shoulder_x,left_shoulder_y,right_shoulder_x,right_shoulder_y,nose_x,nose_y,nose_z,shoulder_diff,head_forward,posture,bad_posture_streak,depth_change,movement_status,Emotion Detection,Pitch (Hz),Jitter,Shimmer,Voice State,WPM,Avg Sentence Length,Stutters,Clarity,Task Timestamp
+2025-08-13 13:51:28,

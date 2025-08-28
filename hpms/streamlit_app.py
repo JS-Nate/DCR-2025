@@ -196,10 +196,75 @@ if page == "HPMS Dashboard":
     st.caption("Real-time Output/Input performance with PSF loads, alerts, and HPSN integration.")
 
     # ---- Data upload ----
-    with st.expander("📄 Upload Scenario Data (CSV)", expanded=True):
+    with st.expander("Upload Scenario Data (CSV)", expanded=True):
         uploaded_file = st.file_uploader("Upload CSV file", type="csv")
         if uploaded_file:
             df = pd.read_csv(uploaded_file)
+            
+            
+            
+            
+            # --- Adapter for Aug13_HPMS_5s_v2.csv (with task description column) ---
+
+            rename_map = {
+                "skin_temperature": "skin_temp",
+                "body_posture": "posture",
+                "room_temperature": "room_temp",
+                "light_temperature": "cct_temp",
+                "room_light_intensity": "light_intensity",
+                "room_humidity": "humidity",
+                "room_pressure": "pressure",
+            }
+            df = df.rename(columns={c: rename_map.get(c, c) for c in df.columns})
+
+            # Parse and clean timestamp
+            df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+            df = df.dropna(subset=["timestamp"]).sort_values("timestamp").reset_index(drop=True)
+
+            # Derive face_stress if not present
+            if "face_stress" not in df.columns:
+                def _derive_stress(em):
+                    e = str(em).strip().lower()
+                    if e in ("sad","fear","angry"): return "high"
+                    if e in ("surprised",): return "medium"
+                    return "low"
+                df["face_stress"] = df.get("face_emotion", "").map(_derive_stress)
+
+            # Use your new task description column directly
+            # (adjust column name if different, e.g., 'task_description' or 'task_timestamp')
+            task_col = "task_description" if "task_description" in df.columns else "task_timestamp"
+            df["task"] = df[task_col].fillna("unknown")
+
+            # Compute per-row task_start and task_duration
+            df["task_start"] = None
+            current_start, current_task = None, "unknown"
+            for i, row in df.iterrows():
+                if isinstance(row[task_col], str) and row[task_col].strip():
+                    # treat any non-empty entry as the start of a new task
+                    current_start = row["timestamp"]
+                    current_task = row[task_col]
+                df.at[i, "task_start"] = current_start
+                if not df.at[i, "task"]:
+                    df.at[i, "task"] = current_task
+            df["task_start"] = pd.to_datetime(df["task_start"], errors="coerce")
+            df["task_duration"] = (df["timestamp"] - df["task_start"]).dt.total_seconds().fillna(0).astype(int)
+
+            # Reactor status default if missing
+            if "reactor_status" not in df.columns:
+                df["reactor_status"] = "normal"
+
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
             # Required inputs (outputs are optional and will fall back if missing)
             required_cols = [
                 'timestamp', 'heart_rate', 'skin_temp', 'posture', 'eye_tracking', 'voice',
@@ -335,15 +400,12 @@ if page == "HPMS Dashboard":
         else:
             st.success("No recent performance alerts.")
 
-        with st.expander("ℹ Emotion Code Legend"):
-            st.markdown("1=happy, 2=neutral, 3=surprised, 4=sad, 5=fear, 6=angry")
-
         # ----------------- HPSN SUGGESTIONS (legacy) -----------------
         st.markdown("### HPSN Suggestions (legacy query_hpsn)")
         st.write(hpsn_suggestions_text if hpsn_suggestions else "No HPSN suggestions available.")
 
         # ----------------- Module 5 — Live Reasoning Output -----------------
-        st.markdown("### Module 5 — Live Reasoning (infer_state / predict_state)")
+        st.markdown("### HPSN — Live Reasoning (infer_state / predict_state)")
         payload = {
             "version": "v1",
             "timestamp": (
@@ -383,7 +445,7 @@ if page == "HPMS Dashboard":
         # Explanation retrieval
         exp_id = inf.get("explanation_id") if isinstance(inf, dict) else None
         if exp_id:
-            with st.expander("🧭 Show explanation trace"):
+            with st.expander("Show explanation trace"):
                 pretty_json(explain(exp_id))
 
         # ----------------- 🫀 Physiological Feedback (LLaMA + fallback) -----------------
@@ -642,7 +704,7 @@ elif page == "HPSN Explorer":
     pretty_json(get_recent_explanations(limit=10))
 
     # --- Config bundle viewer (for HPMS Function 1) ---
-    with st.expander("📦 HPSN Config Bundle (for HPMS configuration)"):
+    with st.expander("HPSN Config Bundle (for HPMS configuration)"):
         if st.button("Load Config Bundle"):
             bundle = get_config_bundle()
             pretty_json(bundle)
