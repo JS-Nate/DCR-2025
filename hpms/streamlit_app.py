@@ -1,16 +1,19 @@
 # streamlit_app.py
 # ---------------------------------------------------------------------
 # Two-page UI:
-#   - HPMS Dashboard: your main pipeline (upload CSV, run analysis, Physiological Feedback / LLaMA, suggestions)
+#   - HPMS Dashboard: main pipeline (upload CSV, run analysis, LLaMA physio feedback, suggestions)
 #   - HPSN Explorer: inspect Module 5 (graph, nodes/edges, explanations, live reasoning)
 # ---------------------------------------------------------------------
 
 import datetime
+from datetime import datetime as dt, timedelta
 import json
 from typing import Any
-
+import time
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
+
 # ---------- Helpers for LLaMA render ----------
 def _extract_json_and_narrative(txt: str):
     """Return (json_obj, narrative_str) or (None, cleaned_txt). Robustly finds first JSON block."""
@@ -54,7 +57,6 @@ def _chip(label, color="gray"):
     return f"<span style='display:inline-block;padding:2px 8px;border-radius:12px;background:{colors.get(color,'#6b7280')};color:#fff;font-size:12px;margin-right:6px'>{label}</span>"
 
 def render_physio_feedback_ui(data: dict, narrative: str = ""):
-    import pandas as pd
     st.subheader("Structured Physiological Feedback")
 
     # Summary chips
@@ -66,7 +68,11 @@ def render_physio_feedback_ui(data: dict, narrative: str = ""):
 
     chips = _chip(f"State: {state.upper()}", color)
     if conf is not None:
-        chips += " " + _chip(f"Confidence: {round(float(conf)*100):d}%", "blue")
+        try:
+            pct = round(float(conf) * 100)
+            chips += " " + _chip(f"Confidence: {pct:d}%", "blue")
+        except Exception:
+            pass
     if drivers:
         chips += " " + "".join(_chip(f"Driver: {d}", "gray") for d in drivers[:3])
     st.markdown(chips, unsafe_allow_html=True)
@@ -85,7 +91,7 @@ def render_physio_feedback_ui(data: dict, narrative: str = ""):
         for b in interp:
             st.markdown(f"- {b}")
 
-    # Recommendations as “cards”
+    # Recommendations
     recs = data.get("physiological_health_recommendations", [])
     if recs:
         st.markdown("**Physiological Health Recommendations**")
@@ -100,11 +106,9 @@ def render_physio_feedback_ui(data: dict, narrative: str = ""):
                 if r.get("constraints"):
                     st.caption(f"Constraints: {r['constraints']}")
 
-    # Narrative (clean, no JSON leakage)
     if narrative:
         st.markdown("**Brief Narrative**")
         st.write(narrative[:800])
-
 
 
 def show_df(df, *, use_container_width=True):
@@ -135,25 +139,33 @@ from analysis import (
 
 # ---------- HPSN (Module 5) ----------
 from hpsn import (
-    # legacy-compatible api
     load_hpsn, query_hpsn, update_hpsn, map_inputs_to_nodes, save_hpsn,
-    # config + reasoning apis
     get_config_bundle, get_measure_catalog, get_measure_mapping, get_threshold_profiles, get_estimation_spec,
     infer_state, predict_state, explain,
-    # explorer/introspection helpers
     get_version_info, get_structure_report, list_nodes, list_edges, get_node_details,
-    get_recent_explanations, get_graph_dot,
+    get_recent_explanations, get_graph_dot, get_ego_graph_dot,
 )
+
 
 # ================== App Setup ==================
 st.set_page_config(page_title="SMR HPMS + HPSN", layout="wide")
-load_hpsn()  # initialize network if needed
+load_hpsn()
 
-# Sidebar navigation
+# Sidebar navigation + options
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to:", ["HPMS Dashboard", "HPSN Explorer"], index=0)
 
-# Session state: keep last uploaded dataframe available across pages
+st.sidebar.markdown("### Options")
+use_llama = st.sidebar.checkbox("Enable LLaMA Physiological Feedback", value=True)
+
+# Streaming controls
+st.sidebar.markdown("### Streaming")
+simulate_stream = st.sidebar.checkbox("Simulate 1‑min streaming", value=False)
+stream_speed = st.sidebar.slider("Seconds to display each 1‑min window", 1, 60, 60)
+force_update = st.sidebar.button('Update page', help='Manually refresh the analysis now')
+
+
+# Session state
 if "df" not in st.session_state:
     st.session_state.df = None
 if "last_row" not in st.session_state:
@@ -162,6 +174,22 @@ if "alert_log" not in st.session_state:
     st.session_state.alert_log = []
 if "feedback_log" not in st.session_state:
     st.session_state.feedback_log = []
+if "stream_windows" not in st.session_state:
+    st.session_state.stream_windows = []
+if "stream_idx" not in st.session_state:
+    st.session_state.stream_idx = 0
+if "stream_running" not in st.session_state:
+    st.session_state.stream_running = False
+
+# --- NEW: streaming-by-rows settings/state ---
+if "stream_chunk_bounds" not in st.session_state:
+    st.session_state.stream_chunk_bounds = []   # list of (start_idx, end_idx_exclusive)
+if "stream_chunk_size" not in st.session_state:
+    st.session_state.stream_chunk_size = 12     # 12 rows == 1 minute window
+if "stream_window_s" not in st.session_state:
+    st.session_state.stream_window_s = 60       # display each window for 60s
+if "next_switch_at" not in st.session_state:
+    st.session_state.next_switch_at = None      # datetime to advance to next chunk
 
 
 # ================== Helpers ==================
@@ -200,12 +228,8 @@ if page == "HPMS Dashboard":
         uploaded_file = st.file_uploader("Upload CSV file", type="csv")
         if uploaded_file:
             df = pd.read_csv(uploaded_file)
-            
-            
-            
-            
-            # --- Adapter for Aug13_HPMS_5s_v2.csv (with task description column) ---
 
+            # --- Adapter for known column names ---
             rename_map = {
                 "skin_temperature": "skin_temp",
                 "body_posture": "posture",
@@ -230,22 +254,24 @@ if page == "HPMS Dashboard":
                     return "low"
                 df["face_stress"] = df.get("face_emotion", "").map(_derive_stress)
 
-            # Use your new task description column directly
-            # (adjust column name if different, e.g., 'task_description' or 'task_timestamp')
-            task_col = "task_description" if "task_description" in df.columns else "task_timestamp"
-            df["task"] = df[task_col].fillna("unknown")
+            # Task column
+            task_col = "task_description" if "task_description" in df.columns else ("task_timestamp" if "task_timestamp" in df.columns else None)
+            if task_col:
+                df["task"] = df[task_col].fillna("unknown")
+            elif "task" not in df.columns:
+                df["task"] = "unknown"
 
             # Compute per-row task_start and task_duration
             df["task_start"] = None
             current_start, current_task = None, "unknown"
-            for i, row in df.iterrows():
-                if isinstance(row[task_col], str) and row[task_col].strip():
-                    # treat any non-empty entry as the start of a new task
-                    current_start = row["timestamp"]
-                    current_task = row[task_col]
-                df.at[i, "task_start"] = current_start
-                if not df.at[i, "task"]:
-                    df.at[i, "task"] = current_task
+            if task_col:
+                for i, row_i in df.iterrows():
+                    if isinstance(row_i[task_col], str) and row_i[task_col].strip():
+                        current_start = row_i["timestamp"]
+                        current_task = row_i[task_col]
+                    df.at[i, "task_start"] = current_start
+                    if not df.at[i, "task"]:
+                        df.at[i, "task"] = current_task
             df["task_start"] = pd.to_datetime(df["task_start"], errors="coerce")
             df["task_duration"] = (df["timestamp"] - df["task_start"]).dt.total_seconds().fillna(0).astype(int)
 
@@ -253,19 +279,7 @@ if page == "HPMS Dashboard":
             if "reactor_status" not in df.columns:
                 df["reactor_status"] = "normal"
 
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            # Required inputs (outputs are optional and will fall back if missing)
+            # Required inputs
             required_cols = [
                 'timestamp', 'heart_rate', 'skin_temp', 'posture', 'eye_tracking', 'voice',
                 'face_emotion', 'face_stress', 'task', 'task_duration',
@@ -282,11 +296,11 @@ if page == "HPMS Dashboard":
                 ]
                 for c in optional_cols:
                     if c not in df.columns:
-                        df[c] = None  # so row.get(...) works
+                        df[c] = None
 
                 # Prepare time and sort
                 df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
-                df = df.dropna(subset=['timestamp']).sort_values(by='timestamp')
+                df = df.dropna(subset=['timestamp']).sort_values(by='timestamp').reset_index(drop=True)
                 st.session_state.df = df
                 st.success(f"Loaded {len(df)} rows.")
                 show_df(df.head())
@@ -294,11 +308,99 @@ if page == "HPMS Dashboard":
     df = st.session_state.df
 
     if df is not None and not df.empty:
-        # Use last record as "current" (with slider to choose)
-        st.subheader("Run Analysis on Selected Row")
-        idx = st.slider("Row index", 0, len(df) - 1, len(df) - 1)
-        row = df.iloc[idx]
+        # ----------------- STREAMING (12 rows / 60s) -----------------
+        # Build chunk bounds once (or when df length changes)
+        if (not st.session_state.stream_chunk_bounds) or \
+           (st.session_state.stream_chunk_bounds and st.session_state.stream_chunk_bounds[-1][1] != len(df)):
+            st.session_state.stream_chunk_bounds = [(i, min(i + st.session_state.stream_chunk_size, len(df)))
+                                                    for i in range(0, len(df), st.session_state.stream_chunk_size)]
+            st.session_state.stream_idx = 0
+            st.session_state.next_switch_at = None
+
+
+        # Advance to next window if deadline passed (triggered on rerun from the component)
+        if simulate_stream and st.session_state.next_switch_at is not None and dt.utcnow() >= st.session_state.next_switch_at:
+            st.session_state.stream_idx += 1
+            if st.session_state.stream_idx >= len(st.session_state.stream_chunk_bounds):
+                st.session_state.stream_idx = len(st.session_state.stream_chunk_bounds) - 1  # clamp last
+            st.session_state.next_switch_at = dt.utcnow() + timedelta(seconds=st.session_state.stream_window_s)
+        # Tie slider to window seconds (user can override 60s)
+        if stream_speed and stream_speed != st.session_state.stream_window_s:
+            st.session_state.stream_window_s = int(stream_speed)
+
+        # Streaming heartbeat
+        if simulate_stream:
+            # Initialize deadline
+            if st.session_state.next_switch_at is None:
+                st.session_state.next_switch_at = dt.utcnow() + timedelta(seconds=st.session_state.stream_window_s)
+
+            # Countdown and auto-switch
+            secs_left = max(0, int((st.session_state.next_switch_at - dt.utcnow()).total_seconds()))
+            if secs_left <= 0:
+                st.session_state.stream_idx += 1
+                if st.session_state.stream_idx >= len(st.session_state.stream_chunk_bounds):
+                    st.session_state.stream_idx = len(st.session_state.stream_chunk_bounds) - 1  # clamp last
+                st.session_state.next_switch_at = dt.utcnow() + timedelta(seconds=st.session_state.stream_window_s)
+                # Force a re-run to show the next window immediately
+                st.experimental_set_query_params(_=dt.utcnow().strftime("%H%M%S"))
+
+        # Pick the current chunk (either streaming or manual)
+        cur_chunk_idx = st.session_state.stream_idx if simulate_stream else st.number_input(
+            "Manual window (12-row chunk #)",
+            min_value=0,
+            max_value=max(0, len(st.session_state.stream_chunk_bounds)-1),
+            value=min(st.session_state.stream_idx, max(0, len(st.session_state.stream_chunk_bounds)-1)),
+            step=1
+        )
+
+        if not st.session_state.stream_chunk_bounds:
+            st.warning("No data windows available.")
+            st.stop()
+
+        start_i, end_i = st.session_state.stream_chunk_bounds[cur_chunk_idx]
+        window_df = df.iloc[start_i:end_i].copy()
+
+        # Show window context
+        left_info, right_info = st.columns(2)
+        with left_info:
+            st.subheader("Current 1-Minute Window")
+            st.caption(f"Rows {start_i}–{end_i-1} of {len(df)-1}  •  Window #{cur_chunk_idx+1}/{len(st.session_state.stream_chunk_bounds)}")
+            show_df(window_df)
+        with right_info:
+            if simulate_stream:
+                secs_left = max(0, int((st.session_state.next_switch_at - dt.utcnow()).total_seconds()))
+                st.metric("Time left in window", f"{secs_left}s")
+                total = max(1, st.session_state.stream_window_s)
+                st.progress(min(1.0, 1.0 - (secs_left / total)))
+                # Schedule a no-reload, one-shot rerun at the deadline using a Streamlit component
+                ms_left = max(0, int((st.session_state.next_switch_at - dt.utcnow()).total_seconds() * 1000))
+                # small safety buffer
+                ms_left = ms_left + 100
+                _ = components.html(
+                    f"""
+                    <script>
+                      var ms = {ms_left};
+                    </script>
+                    <script src="https://unpkg.com/streamlit-component-lib/dist/index.js"></script>
+                    <script>
+                      // Notify Streamlit (no page reload). This updates the component's value and triggers a rerun.
+                      function triggerRerun() {{ Streamlit.setComponentValue(Date.now()); }}
+                      // If ms is 0, send immediately; otherwise schedule.
+                      if (ms <= 0) {{ triggerRerun(); }} else {{ setTimeout(triggerRerun, ms); }}
+                    </script>
+                    """,
+                    height=0
+                )
+
+
+
+
+        # Choose the last row of the window for downstream analysis (mimics "latest reading" in that minute)
+        row = window_df.iloc[-1]
         st.session_state.last_row = row.to_dict()
+
+        # ============== ORIGINAL ANALYSIS USING `row` ==============
+        st.subheader("Run Analysis on Current Window (last reading)")
 
         # -------- Extract inputs --------
         hr = safe_float(row.get('heart_rate'), 0)
@@ -410,7 +512,7 @@ if page == "HPMS Dashboard":
             "version": "v1",
             "timestamp": (
                 row.get("timestamp").isoformat()
-                if isinstance(row.get("timestamp"), (datetime.datetime, pd.Timestamp))
+                if isinstance(row.get("timestamp"), (datetime.datetime, pd.Timestamp, pd.NaT.__class__))
                 else datetime.datetime.utcnow().isoformat()
             ),
             "operator_id": "opA",
@@ -448,16 +550,17 @@ if page == "HPMS Dashboard":
             with st.expander("Show explanation trace"):
                 pretty_json(explain(exp_id))
 
-        # ----------------- 🫀 Physiological Feedback (LLaMA + fallback) -----------------
-        st.markdown("### 🫀 Physiological Feedback")
-        row_json = json.dumps(st.session_state.last_row or {}, default=str)
-        hpsn_evidence = {
-            "per_group_loads": per_group_loads if isinstance(per_group_loads, dict) else {},
-            "input_load": input_load_score if isinstance(input_load_score, (int, float)) else None,
-        }
-        hpsn_json = json.dumps(hpsn_evidence, default=str)
+        # ----------------- 🫀 Physiological Feedback (only when enabled) -----------------
+        if use_llama:
+            st.markdown("### 🫀 Physiological Feedback")
+            row_json = json.dumps(st.session_state.last_row or {}, default=str)
+            hpsn_evidence = {
+                "per_group_loads": per_group_loads if isinstance(per_group_loads, dict) else {},
+                "input_load": input_load_score if isinstance(input_load_score, (int, float)) else None,
+            }
+            hpsn_json = json.dumps(hpsn_evidence, default=str)
 
-        physio_prompt = f"""
+            physio_prompt = f"""
 You are a safety-aware assistant producing physiological feedback for a nuclear control room operator.
 Focus ONLY on human physiology and operator self-regulation. Do NOT make plant/environment control decisions.
 
@@ -484,10 +587,7 @@ TASK:
     {{"param":"face_stress","value":"low|medium|high","status":"safe|warning|danger","reason":"..."}},
     {{"param":"emotion","value":"...","status":"safe|warning|danger","reason":"..."}}
   ],
-  "physiological_interpretation": [
-    // short, threshold-grounded bullets (no speculation)
-  ],
-
+  "physiological_interpretation": [],
   "physiological_health_recommendations": [
     {{
       "label":"paced_breathing_60s",
@@ -497,36 +597,8 @@ TASK:
       "expected_effect":"lower sympathetic arousal; HR trend down",
       "monitor":"recheck HR and stress label after 5–10 min",
       "constraints":"do not perform if feeling dizzy; pause and notify supervisor"
-    }},
-    {{
-      "label":"visual_reset_20_20_20",
-      "why":"eye strain/frequent blinking",
-      "how_to":"Every 20 min, look 20 ft away for 20 s; blink deliberately.",
-      "duration_s":20,
-      "expected_effect":"reduce visual fatigue",
-      "monitor":"blink comfort; eye-tracking anomaly ↓",
-      "constraints":"n/a"
-    }},
-    {{
-      "label":"microbreak_posture_reset",
-      "why":"posture/voice strain",
-      "how_to":"Stand 60 s, shoulder rolls x6, gentle neck stretch.",
-      "duration_s":60,
-      "expected_effect":"reduce muscle tension",
-      "monitor":"perceived effort ↓",
-      "constraints":"avoid if balance impaired"
-    }},
-    {{
-      "label":"sip_water",
-      "why":"dry air (humidity low) or voice strain",
-      "how_to":"Sip 50–100 ml water.",
-      "duration_s":30,
-      "expected_effect":"improve thermoregulation/voice clarity",
-      "monitor":"voice strain ↓",
-      "constraints":"follow site hydration rules"
     }}
   ],
-
   "monitoring_next":[
     "Watch HR and facial-stress label for 5–10 min after intervention"
   ]
@@ -535,57 +607,50 @@ TASK:
 2) After the JSON, write <=100 words summarizing state and the top 1–2 recommended steps.
 Return valid JSON FIRST, then the narrative.
 """
+            left, right = st.columns(2)
 
-        left, right = st.columns(2)
+            raw = ""
+            with left:
+                if HAS_LLAMA:
+                    with st.expander("Run LLaMA Physiological Feedback"):
+                        model = st.text_input("Ollama model", value="llama2")
+                        try:
+                            raw = llama_utils.query_llama(physio_prompt)
+                        except Exception as e:
+                            raw = f"[ollama error] {e}"
+                        st.text_area("Raw LLaMA Output", raw, height=240)
+                else:
+                    st.caption("llama_utils.py not loaded.")
 
-        # Call LLaMA if available
-        raw = ""
-        with left:
-            if HAS_LLAMA:
-                with st.expander("Run LLaMA Physiological Feedback"):
-                    model = st.text_input("Ollama model", value="llama2")
-                    try:
-                        raw = llama_utils.query_llama(physio_prompt)  # or run_llama if you added a wrapper
-                    except Exception as e:
-                        raw = f"[ollama error] {e}"
-                    st.text_area("Raw LLaMA Output", raw, height=240)
-            else:
-                st.caption("llama_utils.py not loaded; using local fallback rules.")
-
-        # Process LLaMA output or use local fallback
-        with right:
-            import json as _json
-
-            data = None
-            narrative = ""
-            if HAS_LLAMA and raw:
-                data, narrative = _extract_json_and_narrative(raw)
-
-            if data:
-                # pretty JSON (optional for power users)
-                with st.expander("Show JSON (debug)"):
-                    st.code(_json.dumps(data, indent=2), language="json")
-                render_physio_feedback_ui(data, narrative)
-            else:
-                # Local fallback
-                fallback = {
-                    "summary": {"state": "watch", "drivers": ["physiological"], "confidence": 0.7},
-                    "observations": [],
-                    "physiological_interpretation": [],
-                    "physiological_health_recommendations": build_local_physiological_feedback(
-                        hr=hr,
-                        skin_temp=skin_temp,
-                        stress=stress,
-                        emotion=emotion,
-                        posture=posture,
-                        eye_tracking=eye_tracking,
-                        voice=voice,
-                        humidity=humidity,
-                    ),
-                    "monitoring_next": ["Watch HR and facial-stress label for 5–10 min after intervention"],
-                }
-                render_physio_feedback_ui(fallback, "Fallback guidance shown. Apply the first recommendation and reassess in 5–10 minutes.")
-
+            with right:
+                import json as _json
+                data, narrative = (None, "")
+                if HAS_LLAMA and raw:
+                    data, narrative = _extract_json_and_narrative(raw)
+                if data:
+                    with st.expander("Show JSON (debug)"):
+                        st.code(_json.dumps(data, indent=2), language="json")
+                    render_physio_feedback_ui(data, narrative)
+                else:
+                    # Local fallback
+                    fallback = {
+                        "summary": {"state": "watch", "drivers": ["physiological"], "confidence": 0.7},
+                        "observations": [],
+                        "physiological_interpretation": [],
+                        "physiological_health_recommendations": build_local_physiological_feedback(
+                            hr=hr,
+                            skin_temp=skin_temp,
+                            stress=stress,
+                            emotion=emotion,
+                            posture=posture,
+                            eye_tracking=eye_tracking,
+                            voice=voice,
+                            humidity=humidity,
+                        ),
+                        "monitoring_next": ["Watch HR and facial-stress label for 5–10 min after intervention"],
+                    }
+                    render_physio_feedback_ui(fallback, "Fallback guidance shown. Apply the first recommendation and reassess in 5–10 minutes.")
+        # else: fully hidden when disabled
 
         # ----------------- REPORT -----------------
         st.markdown("### Scenario Summary Report")
@@ -627,106 +692,256 @@ HPSN Suggestions:
 """
         st.text_area("Generated Report:", report_text, height=320)
         st.download_button(
-            label="📥 Download Scenario Report",
+            label="Download Scenario Report",
             data=str(report_text),
-            file_name=f"scenario_report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            # file_name=f"scenario_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+            file_name = f"scenario_report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+
         )
 
         # ----------------- ENVIRONMENT COMMANDS -----------------
-        st.markdown("### ⚙️ Environment Adjustment Commands")
+        st.markdown("### Environment Adjustment Commands")
         env_cmds = generate_environment_commands(cct_temp, light_intensity, humidity, pressure)
         if env_cmds:
             for cmd in env_cmds:
                 st.code(cmd, language="python")
         else:
             st.caption("Environment within nominal ranges. No commands generated.")
-    else:
-        st.info("Upload a CSV to begin. Required columns are:")
-        st.code(", ".join([
-            'timestamp','heart_rate','skin_temp','posture','eye_tracking','voice',
-            'face_emotion','face_stress','task','task_duration',
-            'room_temp','cct_temp','light_intensity','humidity','pressure'
-        ]))
-        st.caption("Optional outputs: task_success, completion_time_s, decision_accuracy, operational_stability, situational_awareness, reactor_status.")
+    
+        # ---- Auto-refresh (1s) placed at END so all panels render before rerun ----
+        if simulate_stream:
+            time.sleep(1)
+            try:
+                st.rerun()
+            except Exception:
+                try:
+                    st.experimental_rerun()
+                except Exception:
+                    pass
 
+        else:
+                st.info("Upload a CSV to begin. Required columns are:")
+                st.code(", ".join([
+                    'timestamp','heart_rate','skin_temp','posture','eye_tracking','voice',
+                    'face_emotion','face_stress','task','task_duration',
+                    'room_temp','cct_temp','light_intensity','humidity','pressure'
+                ]))
+                st.caption("Optional outputs: task_success, completion_time_s, decision_accuracy, operational_stability, situational_awareness, reactor_status.")
 
 # =================================================================
 # Page 2: HPSN Explorer
 # =================================================================
 elif page == "HPSN Explorer":
-    st.title("HPSN Explorer (Module 5)")
 
-    # --- Overview ---
-    col1, col2 = st.columns(2)
+    st.title("HPSN Explorer (Interactive & Hierarchical)")
+
+    # ------------- TOP-LEVEL OVERVIEW -------------
+    with st.container(border=True):
+        rep = get_structure_report(top_k=10)
+        summary = rep["summary"]
+        node_type_counts = rep["node_type_counts"]
+        measure_count = rep["measure_count"]
+        colA, colB, colC, colD = st.columns(4)
+        colA.metric("Version", summary["version"])
+        colB.metric("Nodes", summary["nodes"])
+        colC.metric("Edges", summary["edges"])
+        colD.metric("Measures", measure_count)
+
+    # Small overview graph
+    with st.expander("Overview graph", expanded=True):
+        max_nodes = st.slider("Max nodes to render", 50, 400, 200, 25, key="max_nodes_overview")
+        dot = get_graph_dot(max_nodes=max_nodes)
+        try:
+            st.graphviz_chart(dot, use_container_width=True)
+        except Exception:
+            st.info("Graphviz rendering not available.")
+
+    # ------------- SECOND LEVEL: DRILL-DOWN -------------
+    st.subheader("Drill-down by Component")
+
+    # Node browser
+    col1, col2 = st.columns([1,2])
     with col1:
-        st.subheader("Version & Summary")
-        pretty_json(get_version_info())
+        node_type = st.selectbox(
+            "Filter by type",
+            ["", "operator_state", "env_condition", "task", "operator_action", "plant_action", "unknown"],
+            index=0,
+            key="node_type_filter"
+        )
+        search = st.text_input("Search node id (contains)", key="node_search")
+        nodes = list_nodes(node_type=node_type or None, search=search or None)
+        node_ids = [n["node_id"] for n in nodes]
+        selected_node = st.selectbox("Select a node", [""] + node_ids, index=0, key="selected_node")
+
+        st.caption(f"{len(nodes)} match(es)")
+
     with col2:
-        st.subheader("Structure Report")
-        pretty_json(get_structure_report())
+        if selected_node:
+            with st.container(border=True):
+                st.markdown(f"### Node: `{selected_node}`")
+                details = get_node_details(selected_node)
+                if "error" in details:
+                    st.error("Node not found")
+                else:
+                    st.markdown("**Attributes**")
+                    pretty_json(details.get("data", {}))
 
-    # --- Graph preview ---
-    st.subheader("Network Graph (preview)")
-    max_nodes = st.slider("Max nodes to render", 50, 400, 200, 25)
-    dot = get_graph_dot(max_nodes=max_nodes)
-    try:
-        st.graphviz_chart(dot, use_container_width=True)
-    except Exception:
-        st.info("Graphviz rendering not available. Use tables below.")
+                    radius = st.slider("Neighborhood radius", 1, 3, 1, 1, key="ego_radius")
+                    dot_local = get_ego_graph_dot(selected_node, radius=radius, max_nodes=80)
+                    st.graphviz_chart(dot_local, use_container_width=True)
 
-    # --- Nodes browser ---
-    st.subheader("Nodes")
-    node_type = st.selectbox(
-        "Filter by type",
-        ["", "operator_state", "env_condition", "task", "operator_action", "plant_action", "unknown"],
-        index=0,
-    )
-    search = st.text_input("Search node id (contains)")
-    nodes = list_nodes(node_type=node_type or None, search=search or None)
-    st.caption(f"{len(nodes)} nodes")
-    show_df(pd.DataFrame(nodes))
+                    col_in, col_out = st.columns(2)
+                    with col_in:
+                        st.markdown("**Incoming edges**")
+                        st.dataframe(pd.DataFrame(details.get("in_edges", [])))
+                    with col_out:
+                        st.markdown("**Outgoing edges**")
+                        st.dataframe(pd.DataFrame(details.get("out_edges", [])))
 
-    # --- Node details inspector ---
-    st.subheader("Node Details")
-    node_id = st.text_input("Inspect node id")
-    if node_id:
-        pretty_json(get_node_details(node_id))
-
-    # --- Edges browser ---
+    # Edge browser with expandable rows
     st.subheader("Edges")
-    edge_type = st.selectbox("Filter by edge type", ["", "causal", "mitigative", "impacts", "unknown"], index=0)
+    edge_type = st.selectbox("Filter by edge type", ["", "causal", "mitigative", "impacts", "unknown"], index=0, key="edge_type_filter")
     edges = list_edges(edge_type=edge_type or None)
     st.caption(f"{len(edges)} edges")
-    show_df(pd.DataFrame(edges))
+    st.dataframe(pd.DataFrame(edges))
 
-    # --- Recent explanation traces ---
+    # ---------- Pretty helpers (defined once) ----------
+    if "_render_measure_card" not in globals():
+        def _pill(text: str):
+            st.markdown(
+                "<span style='display:inline-block;padding:4px 10px;border-radius:999px;background:#eef2ff;border:1px solid #e5e7eb;font-size:12px;margin-right:6px'>"
+                + str(text) + "</span>",
+                unsafe_allow_html=True,
+            )
+
+        def _subpill(text: str):
+            st.markdown(
+                "<span style='display:inline-block;padding:2px 8px;border-radius:999px;background:#f1f5f9;border:1px solid #e5e7eb;font-size:11px;margin-right:4px'>"
+                + str(text) + "</span>",
+                unsafe_allow_html=True,
+            )
+
+        def _small(txt: str):
+            st.markdown(f"<div style='color:#6b7280;font-size:12px'>{txt}</div>", unsafe_allow_html=True)
+
+        def _render_thresholds(th_profiles):
+            if not th_profiles:
+                _small("No threshold profiles defined.")
+                return
+            for prof in th_profiles:
+                st.markdown(f"**Profile:** `{prof.get('profile_id','unknown')}`")
+                rngs = prof.get("ranges", [])
+                if rngs:
+                    df = pd.DataFrame(rngs)
+                    st.dataframe(df, use_container_width=True, hide_index=True)
+                st.divider()
+
+        def _render_measure_card(m, mapping, thresholds, est_spec):
+            # Header & summary
+            st.markdown(f"### {m['measure_id']} — {m['name']}")
+            _small(m.get("definition", ""))
+
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Unit", m.get("unit", "—"))
+            c2.metric("Aggregation", m.get("aggregation", "—"))
+            c3.metric("Default confidence", m.get("confidence_default", "—"))
+
+            # Linked PSFs
+            st.markdown("**Linked PSFs:**")
+            if m.get("linked_psfs"):
+                cols = st.columns(min(4, len(m["linked_psfs"])))
+                for i, psf in enumerate(m["linked_psfs"]):
+                    with cols[i % len(cols)]:
+                        _pill(psf)
+            else:
+                _small("None")
+
+            st.divider()
+
+            # Estimation
+            st.markdown("#### Estimation")
+            em = m.get("estimation_method", {}) or {}
+            etype = em.get("type", "—")
+            formula = em.get("formula")
+            model_id = em.get("model_id")
+            st.write(f"**Type:** `{etype}`")
+            if formula:
+                st.write(f"**Formula:** `{formula}`")
+            if model_id:
+                st.write(f"**Model:** `{model_id}`")
+
+            # Inputs (deduped from estimation + mapping)
+            inputs = set(em.get("inputs_required", []) or [])
+            for it in mapping.get("inputs_map", []) or []:
+                if isinstance(it, dict) and "signal" in it:
+                    inputs.add(it["signal"])
+            if inputs:
+                st.write("**Inputs used:**")
+                for s in sorted(inputs):
+                    _subpill(s)
+            else:
+                _small("No inputs listed.")
+
+            # Applicability & missing data policy
+            st.divider()
+            st.markdown("#### Applicability & Data Policy")
+            app = mapping.get("applicability", {}) if isinstance(mapping, dict) else {}
+            mdp = mapping.get("missing_data_policy", "—")
+            colA, colB = st.columns(2)
+            with colA:
+                st.write("**Applicability**")
+                if app:
+                    for k, v in app.items():
+                        st.write(f"- **{k}**: {', '.join(v) if isinstance(v, list) else v}")
+                else:
+                    _small("Not specified.")
+            with colB:
+                st.write("**Missing data policy**")
+                st.write(f"`{mdp}`")
+
+            # Thresholds tables
+            st.divider()
+            st.markdown("#### Thresholds")
+            _render_thresholds(thresholds.get("threshold_profiles", []))
+
+    # ------------- MEASURES & THRESHOLDS -------------
+    st.subheader("Measures & Thresholds")
+    meas = get_measure_catalog()["measures"]
+    if meas:
+        meas_labels = [f"{m['measure_id']} — {m['name']}" for m in meas]
+        sel_meas = st.selectbox("Choose a measure", meas_labels, index=0)
+        if sel_meas:
+            mid = sel_meas.split(" — ")[0]
+            _m = next(x for x in meas if x["measure_id"] == mid)
+            _mapping = get_measure_mapping(mid)
+            _thresholds = get_threshold_profiles(mid)
+            _est_spec = get_estimation_spec(mid)
+            _render_measure_card(_m, _mapping, _thresholds, _est_spec)
+    else:
+        st.caption("No measures found.")
+
+    # ------------- REASONING / EXPLANATIONS -------------
     st.subheader("Recent Explanations")
-    pretty_json(get_recent_explanations(limit=10))
+    exps = get_recent_explanations(limit=10)
+    if exps:
+        for e in exps:
+            with st.expander(f"Explanation {e['explanation_id']} — {e.get('timestamp','')}"):
+                st.markdown("**Reasoning path**")
+                for step in e.get("path", []):
+                    st.markdown(f"- {step}")
+                st.markdown("**Evidence**")
+                pretty_json(e.get("evidence", {}))
+    else:
+        st.caption("No explanations yet. Run `infer_state()` from HPMS to generate.")
 
-    # --- Config bundle viewer (for HPMS Function 1) ---
-    with st.expander("HPSN Config Bundle (for HPMS configuration)"):
-        if st.button("Load Config Bundle"):
-            bundle = get_config_bundle()
-            pretty_json(bundle)
-        colA, colB = st.columns(2)
-        with colA:
-            st.caption("Measure Catalog")
-            pretty_json(get_measure_catalog())
-        with colB:
-            st.caption("Threshold Profiles (example: M004)")
-            pretty_json(get_threshold_profiles("M004"))
-
-    # --- Live reasoning demo (reuses last HPMS row) ---
-    st.subheader("Live Reasoning Demo (reuse last HPMS row)")
-    row = st.session_state.last_row
-    if row:
+    # ------------- LIVE REASONING DEMO -------------
+    st.subheader("Live Reasoning Demo")
+    if "last_row" in st.session_state and st.session_state.get("last_row"):
+        row = st.session_state["last_row"]
         payload = {
             "version": "v1",
-            "timestamp": (
-                row.get("timestamp").isoformat()
-                if isinstance(row.get("timestamp"), (datetime.datetime, pd.Timestamp))
-                else datetime.datetime.utcnow().isoformat()
-            ),
+            "timestamp": (row.get("timestamp").isoformat() if hasattr(row.get("timestamp"), "isoformat")
+                        else datetime.datetime.utcnow().isoformat()),
             "operator_id": "opA",
             "task": {"id": row.get("task", "unknown"), "duration_s": int(row.get("task_duration", 0)), "mode": row.get("reactor_status", "normal")},
             "signals": {
@@ -745,12 +960,15 @@ elif page == "HPSN Explorer":
             },
             "reactor_status": row.get("reactor_status", "normal"),
         }
-        colC, colD = st.columns(2)
-        with colC:
+        colR1, colR2 = st.columns(2)
+        with colR1:
             st.caption("infer_state()")
-            pretty_json(infer_state(payload))
-        with colD:
-            st.caption("predict_state() (600s)")
-            pretty_json(predict_state(payload, horizon_s=600))
+            inf = infer_state(payload)
+            pretty_json(inf)
+        with colR2:
+            st.caption("predict_state()")
+            horizon = st.slider("Forecast horizon (seconds)", 60, 3600, 600, 60, key="forecast_h")
+            pred = predict_state(payload, horizon_s=horizon)
+            pretty_json(pred)
     else:
-        st.info("Load a CSV in the HPMS Dashboard to enable this demo.")
+        st.info("Load a CSV in the HPMS Dashboard first to enable live reasoning demo.")

@@ -1,5 +1,4 @@
-
-# HPSN Module (Module 5) – Consolidated with Explorer
+# HPSN Module (Module 5) – Consolidated with Explorer (UPDATED)
 from __future__ import annotations
 import json
 import uuid
@@ -27,7 +26,8 @@ except Exception:
     def compute_output_score(*args, **kwargs):
         return 0.85
 
-VERSION = "hpsn-v1.5"
+VERSION = "hpsn-v1.6"  # bumped
+
 hpsn = nx.DiGraph()
 _EXPLANATIONS: Dict[str, Dict[str, Any]] = {}
 
@@ -301,73 +301,121 @@ def update_hpsn(recommendation_data: Dict[str, Any], feedback: Optional[Dict[str
 
 # ------ Explorer & Introspection ------
 
-def get_structure_report() -> Dict[str, Any]:
-    node_count = hpsn.number_of_nodes()
-    edge_count = hpsn.number_of_edges()
-    type_counts: Dict[str, int] = {}
-    for n, attrs in hpsn.nodes(data=True):
-        t = attrs.get("type", "unknown")
-        type_counts[t] = type_counts.get(t, 0) + 1
-    edge_type_counts: Dict[str, int] = {}
-    for u, v, attrs in hpsn.edges(data=True):
-        et = attrs.get("type", "unknown")
-        edge_type_counts[et] = edge_type_counts.get(et, 0) + 1
-    orphans = [n for n in hpsn.nodes() if hpsn.degree(n) == 0]
-    hubs = sorted([(n, hpsn.degree(n)) for n in hpsn.nodes()], key=lambda x: x[1], reverse=True)[:10]
-    return {
-        "version": VERSION,
-        "nodes": node_count,
-        "edges": edge_count,
-        "node_types": type_counts,
-        "edge_types": edge_type_counts,
-        "orphans": orphans,
-        "top_hubs": hubs,
-        "measure_count": len(_MEASURE_CATALOG),
-        "measures": [m["name"] for m in _MEASURE_CATALOG],
-        "thresholded_measures": list(_THRESHOLDS.keys()),
-    }
-
-def list_nodes(node_type: Optional[str] = None, search: Optional[str] = None) -> List[Dict[str, Any]]:
-    results = []
-    patt = search.lower() if search else None
-    for n, attrs in hpsn.nodes(data=True):
-        if node_type and attrs.get("type") != node_type:
-            continue
-        if patt and patt not in str(n).lower():
-            continue
-        results.append({"id": n, "type": attrs.get("type", "unknown")})
-    return results
-
-def list_edges(edge_type: Optional[str] = None) -> List[Dict[str, Any]]:
-    res = []
-    for u, v, attrs in hpsn.edges(data=True):
-        if edge_type and attrs.get("type") != edge_type:
-            continue
-        res.append({"src": u, "dst": v, "type": attrs.get("type", "unknown"), "weight": attrs.get("weight"), "timestamp": attrs.get("timestamp")})
-    return res
-
-def get_node_details(node_id: str) -> Dict[str, Any]:
-    if node_id not in hpsn.nodes:
-        return {"error": "unknown_node"}
-    preds = [{"id": p, "edge": hpsn.get_edge_data(p, node_id)} for p in hpsn.predecessors(node_id)]
-    succs = [{"id": s, "edge": hpsn.get_edge_data(node_id, s)} for s in hpsn.successors(node_id)]
-    return {"id": node_id, "type": hpsn.nodes[node_id].get("type", "unknown"), "in_edges": preds, "out_edges": succs}
-
-def get_recent_explanations(limit: int = 20) -> List[Dict[str, Any]]:
-    items = list(_EXPLANATIONS.items())
-    def ts_of(v):
-        try:
-            return v[1].get("timestamp", "")
-        except Exception:
-            return ""
-    items.sort(key=ts_of, reverse=True)
-    out = []
-    for k, v in items[:limit]:
-        out.append({"explanation_id": k, **v})
-    return out
-
 def get_version_info() -> Dict[str, Any]:
     return {"version": VERSION, "catalog_size": len(_MEASURE_CATALOG)}
+
+def get_structure_report(top_k: int = 10) -> dict:
+    deg = [(n, hpsn.degree(n)) for n in hpsn.nodes]
+    top_hubs = sorted(deg, key=lambda x: x[1], reverse=True)[:top_k]
+    orphans = [n for n in hpsn.nodes if hpsn.degree(n) == 0]
+    edge_type_counts = {}
+    for u, v, d in hpsn.edges(data=True):
+        et = d.get("type", "unknown")
+        edge_type_counts[et] = edge_type_counts.get(et, 0) + 1
+    node_type_counts = {}
+    for n, d in hpsn.nodes(data=True):
+        nt = d.get("type", "unknown")
+        node_type_counts[nt] = node_type_counts.get(nt, 0) + 1
+    return {
+        "summary": {
+            "version": VERSION,
+            "nodes": hpsn.number_of_nodes(),
+            "edges": hpsn.number_of_edges(),
+            "node_types": sorted({hpsn.nodes[n].get("type", "unknown") for n in hpsn.nodes}),
+        },
+        "node_type_counts": node_type_counts,
+        "edge_type_counts": edge_type_counts,
+        "top_hubs": top_hubs,
+        "orphans": orphans,
+        "measure_count": len(_MEASURE_CATALOG),
+    }
+
+def list_nodes(node_type: str | None = None, search: str | None = None) -> list[dict]:
+    results = []
+    search_low = (search or "").lower()
+    for n, d in hpsn.nodes(data=True):
+        if node_type and d.get("type") != node_type:
+            continue
+        if search and search_low not in str(n).lower():
+            continue
+        results.append({"node_id": n, "type": d.get("type", "unknown")})
+    return sorted(results, key=lambda x: (x["type"], x["node_id"]))
+
+def list_edges(edge_type: str | None = None) -> list[dict]:
+    out = []
+    for u, v, d in hpsn.edges(data=True):
+        if edge_type and d.get("type") != edge_type:
+            continue
+        out.append({
+            "src": u, "dst": v,
+            "type": d.get("type", "unknown"),
+            "weight": d.get("weight", None),
+            "timestamp": d.get("timestamp", None),
+        })
+    return out
+
+def get_node_details(node_id: str) -> dict:
+    if node_id not in hpsn.nodes:
+        return {"error": "node_not_found"}
+    data = hpsn.nodes[node_id]
+    succ = []
+    for v in hpsn.successors(node_id):
+        d = hpsn.get_edge_data(node_id, v)
+        succ.append({"to": v, **d})
+    pred = []
+    for u in hpsn.predecessors(node_id):
+        d = hpsn.get_edge_data(u, node_id)
+        pred.append({"from": u, **d})
+    return {"node_id": node_id, "data": data, "out_edges": succ, "in_edges": pred}
+
+def get_recent_explanations(limit: int = 20) -> list[dict]:
+    items = []
+    for k, v in _EXPLANATIONS.items():
+        items.append({"explanation_id": k, **v})
+    items.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+    return items[:limit]
+
+def get_graph_dot(max_nodes: int = 250) -> str:
+    # Build a DOT graph for overview
+    nodes = list(hpsn.nodes)[:max_nodes]
+    node_set = set(nodes)
+    lines = ["digraph HPSN {", 'rankdir=LR;', 'node [shape=box, fontsize=10];']
+    for n in nodes:
+        t = hpsn.nodes[n].get("type", "unknown")
+        label = f"{n}\\n({t})"
+        lines.append(f'"{n}" [label="{label}"];')
+    for u, v, d in hpsn.edges(data=True):
+        if u in node_set and v in node_set:
+            et = d.get("type", "edge")
+            w = d.get("weight", "")
+            wtxt = (" " + format(w, ".2f")) if isinstance(w, (int, float)) else ""
+            edge_label = f"{et}{wtxt}"
+            lines.append(f'"{u}" -> "{v}" [label="{edge_label}", fontsize=9];')
+    lines.append("}")
+    return "\n".join(lines)
+
+def get_ego_graph_dot(center_id: str, radius: int = 1, max_nodes: int = 60) -> str:
+    # Ego graph for drill-down
+    if center_id not in hpsn.nodes:
+        return 'digraph HPSN { label="Node not found"; }'
+    eg = nx.ego_graph(hpsn, center_id, radius=radius, undirected=False)
+    nodes = list(eg.nodes)[:max_nodes]
+    node_set = set(nodes)
+    lines = ["digraph HPSN {", 'rankdir=LR;', 'node [shape=box, fontsize=10];']
+    for n in nodes:
+        t = hpsn.nodes[n].get("type", "unknown")
+        label = f"{n}\\n({t})"
+        style = 'style="filled", fillcolor="#e2e8f0"' if n == center_id else ""
+        lines.append(f'"{n}" [label="{label}" {style}];')
+    for u, v, d in eg.edges(data=True):
+        if u in node_set and v in node_set:
+            et = d.get("type", "edge")
+            w = d.get("weight", "")
+            wtxt = (" " + format(w, ".2f")) if isinstance(w, (int, float)) else ""
+            edge_label = f"{et}{wtxt}"
+            lines.append(f'"{u}" -> "{v}" [label="{edge_label}", fontsize=9];')
+    lines.append("}")
+    return "\n".join(lines)
 
 # ------ Config artifacts (HPMS Function 1) ------
 
@@ -476,7 +524,6 @@ def predict_state(payload: Dict[str, Any], horizon_s: int = 600) -> Dict[str, An
     return {"version": VERSION, "horizon_s": horizon_s, "state": projected, "per_group_loads": per_group}
 
 def recommend_actions(context: Dict[str, Any]) -> Dict[str, Any]:
-    # kept for backward compatibility (HPMS now owns action selection)
     row_like = {
         "heart_rate": context.get("signals", {}).get("hr_bpm", 0),
         "skin_temp": context.get("signals", {}).get("skin_temp", 0),
@@ -504,111 +551,3 @@ def recommend_actions(context: Dict[str, Any]) -> Dict[str, Any]:
 
 def explain(explanation_id: str) -> Dict[str, Any]:
     return _EXPLANATIONS.get(explanation_id, {"error": "unknown_explanation_id"})
-
-
-
-
-
-# ========= HPSN Explorer / Introspection (safe to add) =========
-
-def get_version_info() -> dict:
-    return {
-        "version": VERSION,
-        "nodes": hpsn.number_of_nodes(),
-        "edges": hpsn.number_of_edges(),
-        "node_types": sorted({hpsn.nodes[n].get("type", "unknown") for n in hpsn.nodes}),
-    }
-
-def get_structure_report(top_k: int = 10) -> dict:
-    import itertools
-    # Degree hubs
-    deg = [(n, hpsn.degree(n)) for n in hpsn.nodes]
-    top_hubs = sorted(deg, key=lambda x: x[1], reverse=True)[:top_k]
-    # Orphans
-    orphans = [n for n in hpsn.nodes if hpsn.degree(n) == 0]
-    # Edge types count
-    edge_type_counts = {}
-    for u, v, d in hpsn.edges(data=True):
-        et = d.get("type", "unknown")
-        edge_type_counts[et] = edge_type_counts.get(et, 0) + 1
-    # Node type counts
-    node_type_counts = {}
-    for n, d in hpsn.nodes(data=True):
-        nt = d.get("type", "unknown")
-        node_type_counts[nt] = node_type_counts.get(nt, 0) + 1
-    return {
-        "summary": get_version_info(),
-        "node_type_counts": node_type_counts,
-        "edge_type_counts": edge_type_counts,
-        "top_hubs": top_hubs,
-        "orphans": orphans,
-    }
-
-def list_nodes(node_type: str | None = None, search: str | None = None) -> list[dict]:
-    results = []
-    search_low = (search or "").lower()
-    for n, d in hpsn.nodes(data=True):
-        if node_type and d.get("type") != node_type:
-            continue
-        if search and search_low not in str(n).lower():
-            continue
-        results.append({"node_id": n, "type": d.get("type", "unknown")})
-    return sorted(results, key=lambda x: (x["type"], x["node_id"]))
-
-def list_edges(edge_type: str | None = None) -> list[dict]:
-    out = []
-    for u, v, d in hpsn.edges(data=True):
-        if edge_type and d.get("type") != edge_type:
-            continue
-        out.append({
-            "src": u, "dst": v,
-            "type": d.get("type", "unknown"),
-            "weight": d.get("weight", None),
-            "timestamp": d.get("timestamp", None),
-        })
-    return out
-
-def get_node_details(node_id: str) -> dict:
-    if node_id not in hpsn.nodes:
-        return {"error": "node_not_found"}
-    data = hpsn.nodes[node_id]
-    succ = []
-    for v in hpsn.successors(node_id):
-        d = hpsn.get_edge_data(node_id, v)
-        succ.append({"to": v, **d})
-    pred = []
-    for u in hpsn.predecessors(node_id):
-        d = hpsn.get_edge_data(u, node_id)
-        pred.append({"from": u, **d})
-    return {"node_id": node_id, "data": data, "out_edges": succ, "in_edges": pred}
-
-def get_recent_explanations(limit: int = 20) -> list[dict]:
-    # _EXPLANATIONS holds {id: {..., 'timestamp': ISO}}
-    items = []
-    for k, v in _EXPLANATIONS.items():
-        items.append({"explanation_id": k, **v})
-    items.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
-    return items[:limit]
-
-def get_graph_dot(max_nodes: int = 250) -> str:
-    """
-    Build a simple DOT graph (compatible with st.graphviz_chart).
-    We keep it small to avoid huge render times.
-    """
-    nodes = list(hpsn.nodes)[:max_nodes]
-    node_set = set(nodes)
-    lines = ["digraph HPSN {", 'rankdir=LR;', 'node [shape=box, fontsize=10];']
-    # Node styling by type
-    for n in nodes:
-        t = hpsn.nodes[n].get("type", "unknown")
-        label = f"{n}\\n({t})"
-        lines.append(f'"{n}" [label="{label}"];')
-    # Edges between included nodes
-    for u, v, d in hpsn.edges(data=True):
-        if u in node_set and v in node_set:
-            et = d.get("type", "edge")
-            w = d.get("weight", "")
-            edge_label = f"{et}{f' {w:.2f}' if isinstance(w, (int,float)) else ''}"
-            lines.append(f'"{u}" -> "{v}" [label="{edge_label}", fontsize=9];')
-    lines.append("}")
-    return "\n".join(lines)

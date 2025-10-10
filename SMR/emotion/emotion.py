@@ -9,7 +9,7 @@ import os
 
 # === GLOBAL SETUP ===
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-cap = cv2.VideoCapture(2)
+cap = cv2.VideoCapture(3)
 
 Operator_name = input("Please Enter your name Before start the Scenario:")
 
